@@ -7,15 +7,19 @@
 - ホーム画面
 ![ホーム](https://github.com/mutsumiyamaguchi/romaji-karuta/blob/main/image/%E3%82%B9%E3%82%AF%E3%83%AA%E3%83%BC%E3%83%B3%E3%82%B7%E3%83%A7%E3%83%83%E3%83%88%202026-05-07%2021.19.47.png)<br>
 <br>
+
 - ゲーム画面
 ![ゲーム画面](https://github.com/mutsumiyamaguchi/romaji-karuta/blob/main/image/%E3%82%B9%E3%82%AF%E3%83%AA%E3%83%BC%E3%83%B3%E3%82%B7%E3%83%A7%E3%83%83%E3%83%88%202026-05-07%2021.19.59.png)<br>
 <br>
+
 - 正解時
 ![正解時](https://github.com/mutsumiyamaguchi/romaji-karuta/blob/main/image/%E3%82%B9%E3%82%AF%E3%83%AA%E3%83%BC%E3%83%B3%E3%82%B7%E3%83%A7%E3%83%83%E3%83%88%202026-05-07%2021.20.20.png)<br>
 <br>
+
 - 不正解時
 ![不正解時](https://github.com/mutsumiyamaguchi/romaji-karuta/blob/main/image/%E3%82%B9%E3%82%AF%E3%83%AA%E3%83%BC%E3%83%B3%E3%82%B7%E3%83%A7%E3%83%83%E3%83%88%202026-05-07%2021.20.25.png)<br>
 <br>
+
 - 問題セット終了時
 ![問題セット終了](https://github.com/mutsumiyamaguchi/romaji-karuta/blob/main/image/%E3%82%B9%E3%82%AF%E3%83%AA%E3%83%BC%E3%83%B3%E3%82%B7%E3%83%A7%E3%83%83%E3%83%88%202026-05-07%2021.20.29.png)<br>
 
