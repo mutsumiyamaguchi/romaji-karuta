@@ -3,7 +3,7 @@
 ローマ字をカルタ感覚で楽しく覚えることができるアプリ
 
 ## 実際の画面
-![ホーム](example.png)<br>
+![ホーム]([example.png](https://github.com/mutsumiyamaguchi/romaji-karuta/blob/main/image/%E3%82%B9%E3%82%AF%E3%83%AA%E3%83%BC%E3%83%B3%E3%82%B7%E3%83%A7%E3%83%83%E3%83%88%202026-05-07%2021.19.47.png))<br>
 
 ## 想定ユーザー
 
