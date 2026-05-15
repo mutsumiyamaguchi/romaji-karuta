@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react';
-import { Star, Flame } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Star, Flame, ChevronDown, User } from 'lucide-react';
 import { rows } from '../data/romaji.js';
 import { MODES, MODE_LABELS } from '../lib/mode.js';
-import { getWeakKanas } from '../lib/mistakesStorage.js';
+import { getWeakCharacters } from '../lib/api/mistakes.js';
 
 // ロゴ長押し（メンター画面の隠し導線）の発動時間
 const LONG_PRESS_MS = 3000;
@@ -10,18 +10,47 @@ const LONG_PRESS_MS = 3000;
 // メニュー画面
 // props:
 //   points: number — 現在の累計ポイント
-//   onStart: (target: string, mode: string) => void
-//     target: 'random' | 'weak' | か行ラベル（'あ' 等）
-//     mode: 'h2r' | 'r2h' | 'H2R'
+//   currentStudent: { id, name } | null
+//   students: Array<{ id, name, points }>
+//   onSelectStudent: (id) => void
+//   onStart: (target, mode) => void
 //   onMentorAccess: () => void — ロゴ長押し検知時（PINダイアログを開く）
-export default function Menu({ points, onStart, onMentorAccess }) {
+export default function Menu({
+  points,
+  currentStudent,
+  students = [],
+  onSelectStudent,
+  onStart,
+  onMentorAccess,
+}) {
   const [mode, setMode] = useState(MODES.h2r);
+  const [weakAvailable, setWeakAvailable] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const longPressTimerRef = useRef(null);
-  const weakAvailable = getWeakKanas(1).length > 0;
 
-  const handleStart = (target) => {
-    onStart(target, mode);
-  };
+  // 現在の生徒の苦手な文字が 1 件以上あるか確認（にがてだけボタンの enable 判定）
+  // setState は必ず非同期コールバック経由で呼ぶ（react-hooks/set-state-in-effect）
+  useEffect(() => {
+    let alive = true;
+    const sid = currentStudent?.id;
+    (async () => {
+      if (!sid) {
+        if (alive) setWeakAvailable(false);
+        return;
+      }
+      try {
+        const arr = await getWeakCharacters(sid, 1);
+        if (alive) setWeakAvailable(arr.length > 0);
+      } catch {
+        if (alive) setWeakAvailable(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [currentStudent?.id]);
+
+  const handleStart = (target) => onStart(target, mode);
 
   const startLongPress = () => {
     if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
@@ -48,13 +77,58 @@ export default function Menu({ points, onStart, onMentorAccess }) {
 
   return (
     <div className="min-h-screen bg-yellow-50 text-gray-800 font-sans p-4 flex flex-col items-center justify-center">
-      {/* ポイント表示 */}
+      {/* 左上: 生徒名バッジ + ピッカー */}
+      <div className="absolute top-4 left-4 z-10">
+        <button
+          onClick={() => setPickerOpen((v) => !v)}
+          className="bg-white px-4 py-2 rounded-full shadow-md flex items-center gap-2 border-2 border-orange-300 active:translate-y-0.5 transition-all"
+        >
+          <User className="w-5 h-5 text-orange-500" />
+          <span className="text-base font-bold text-orange-700">
+            {currentStudent?.name ?? '生徒なし'}
+          </span>
+          <ChevronDown className="w-4 h-4 text-orange-400" />
+        </button>
+        {pickerOpen && (
+          <div className="absolute top-12 left-0 bg-white rounded-2xl shadow-xl border-2 border-orange-200 py-2 w-56 z-20">
+            {students.length === 0 ? (
+              <p className="px-4 py-2 text-sm text-slate-400">
+                生徒が ありません
+              </p>
+            ) : (
+              students.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    onSelectStudent?.(s.id);
+                    setPickerOpen(false);
+                  }}
+                  className={[
+                    'w-full px-4 py-2 text-left flex items-center gap-2 transition-colors',
+                    s.id === currentStudent?.id
+                      ? 'bg-orange-50 text-orange-700 font-bold'
+                      : 'text-slate-700 hover:bg-orange-50',
+                  ].join(' ')}
+                >
+                  <User className="w-4 h-4" />
+                  <span className="flex-1">{s.name}</span>
+                  <span className="text-xs text-amber-600">
+                    {s.points} pt
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 右上: ポイント表示 */}
       <div className="absolute top-4 right-4 bg-white px-4 py-2 rounded-full shadow-md flex items-center gap-2 border-2 border-yellow-400">
         <Star className="text-yellow-400 fill-yellow-400 w-6 h-6" />
         <span className="text-xl font-bold text-yellow-600">{points} ぽいんと</span>
       </div>
 
-      {/* モードタブ（中央、均等幅） */}
+      {/* モードタブ */}
       <div
         className="w-full max-w-2xl mb-6 p-1.5 bg-white rounded-full border-2 border-orange-200 flex gap-2"
         role="tablist"
@@ -74,7 +148,7 @@ export default function Menu({ points, onStart, onMentorAccess }) {
         ))}
       </div>
 
-      {/* ロゴ + キャプション（長押しでメンター画面） */}
+      {/* ロゴ + キャプション（長押しでメンター） */}
       <div
         className="text-center mb-8 select-none cursor-pointer"
         onMouseDown={startLongPress}
@@ -104,7 +178,6 @@ export default function Menu({ points, onStart, onMentorAccess }) {
         ))}
       </div>
 
-      {/* CTA: ぜんぶまぜまぜ + にがてだけ */}
       <div className="w-full max-w-2xl flex flex-col sm:flex-row gap-4 justify-center">
         <button
           onClick={() => handleStart('random')}

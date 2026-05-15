@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Home,
   Settings,
@@ -9,66 +9,194 @@ import {
   Download,
   LogOut,
   Trash2,
+  UserPlus,
+  Check,
+  X,
+  CircleCheck,
+  Circle,
 } from 'lucide-react';
-import {
-  getMistakesSummary,
-  clearMistakes,
-} from '../lib/mistakesStorage.js';
-import {
-  getRevengeOptions,
-  setRevengeOptions,
-  setPin,
-} from '../lib/settingsStorage.js';
+import * as studentsApi from '../lib/api/students.js';
+import * as mistakesApi from '../lib/api/mistakes.js';
+import * as mentorApi from '../lib/api/mentor.js';
+import { ApiError } from '../lib/apiClient.js';
 
 // メンター管理画面（仕様書 §F11/F12）。
-//   PIN 認証後に表示される。F11（生徒選択）は当面 1 名運用想定なのでスタブ表示。
-//   F8（苦手な文字）と設定（リベンジ ON/OFF、PIN 変更、CSV 出力）を提供する。
+//   D1 経由で生徒 CRUD・苦手な文字一覧・リベンジ設定・PIN 変更・CSV 出力を提供する。
 //
 // props:
-//   onClose: () => void — メニュー画面に戻る
-export default function MentorMenu({ onClose }) {
-  const [mistakes, setMistakes] = useState(() => getMistakesSummary());
-  const [revenge, setRevenge] = useState(() => getRevengeOptions());
+//   students: Array<{ id, name, points, created_at }>
+//   currentStudentId: string | null
+//   revengeOptions: { immediate, summary }
+//   onClose: () => void — メニューに戻る（App 側で students/config を再取得する）
+export default function MentorMenu({
+  students: initialStudents = [],
+  currentStudentId,
+  revengeOptions: initialRevenge,
+  onClose,
+}) {
+  const [students, setStudents] = useState(initialStudents);
+  const [selectedStudentId, setSelectedStudentId] = useState(currentStudentId);
+  const [revenge, setRevenge] = useState(initialRevenge);
+  const [mistakes, setMistakes] = useState([]);
+  const [mistakesLoading, setMistakesLoading] = useState(false);
+
+  // 生徒追加
+  const [addOpen, setAddOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [adding, setAdding] = useState(false);
+
+  // PIN 変更
   const [pinChangeMode, setPinChangeMode] = useState(false);
+  const [oldPinInput, setOldPinInput] = useState('');
   const [newPin, setNewPin] = useState('');
   const [pinSaved, setPinSaved] = useState(false);
+  const [pinError, setPinError] = useState('');
 
-  const toggleRevenge = (key) => {
+  // 全体エラー
+  const [error, setError] = useState('');
+
+  // 選択生徒の苦手な文字を取得
+  useEffect(() => {
+    if (!selectedStudentId) {
+      setMistakes([]);
+      return;
+    }
+    let alive = true;
+    setMistakesLoading(true);
+    mistakesApi
+      .listMistakes(selectedStudentId)
+      .then((list) => {
+        if (alive) setMistakes(list);
+      })
+      .catch((e) => {
+        if (alive) setError(`苦手な文字の取得に失敗 (${e.message})`);
+      })
+      .finally(() => {
+        if (alive) setMistakesLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [selectedStudentId]);
+
+  const refreshStudents = async () => {
+    try {
+      const list = await studentsApi.listStudents();
+      setStudents(list);
+      return list;
+    } catch (e) {
+      setError(`生徒一覧の取得に失敗 (${e.message})`);
+      return students;
+    }
+  };
+
+  const handleAddStudent = async () => {
+    setError('');
+    const name = newName.trim();
+    if (!name) {
+      setError('名前を入力してください');
+      return;
+    }
+    setAdding(true);
+    try {
+      const created = await studentsApi.createStudent({ name });
+      const list = await refreshStudents();
+      // 追加した生徒を選択状態にする
+      if (created?.id) setSelectedStudentId(created.id);
+      else if (list.length > 0) setSelectedStudentId(list[list.length - 1].id);
+      setNewName('');
+      setAddOpen(false);
+    } catch (e) {
+      setError(`追加できませんでした (${e.message})`);
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleDeleteStudent = async (id) => {
+    if (!confirm('この生徒を削除します。記録もすべて消えます。よろしいですか？')) return;
+    setError('');
+    try {
+      await studentsApi.deleteStudent({ id });
+      const list = await refreshStudents();
+      if (selectedStudentId === id) {
+        setSelectedStudentId(list[0]?.id ?? null);
+      }
+    } catch (e) {
+      setError(`削除できませんでした (${e.message})`);
+    }
+  };
+
+  const toggleRevenge = async (key) => {
     const next = { ...revenge, [key]: !revenge[key] };
-    setRevenge(next);
-    setRevengeOptions(next);
+    setRevenge(next); // 楽観 UI
+    try {
+      const updated = await mentorApi.updateConfig({ [key]: next[key] });
+      setRevenge(updated);
+    } catch (e) {
+      setError(`設定の保存に失敗 (${e.message})`);
+      // ロールバック
+      setRevenge(revenge);
+    }
   };
 
-  const handleClearMistakes = () => {
-    if (!confirm('苦手な文字をすべてクリアします。よろしいですか？')) return;
-    clearMistakes();
-    setMistakes([]);
+  const handleClearMistakes = async () => {
+    if (!selectedStudentId) return;
+    if (!confirm('苦手な文字の記録をクリアします。よろしいですか？')) return;
+    setError('');
+    try {
+      // 個別削除APIがないので、生徒を削除→再作成は不可能。
+      // 暫定: クライアント側のキャッシュだけクリアし、サーバはそのまま。
+      // 今後 DELETE /api/students/:id/mistakes を追加して置換する。
+      setMistakes([]);
+      setError('注: 全クリアAPIは未実装。一覧表示のみリセットしました。');
+    } catch (e) {
+      setError(`クリアできませんでした (${e.message})`);
+    }
   };
 
-  const handlePinSave = () => {
-    if (!/^\d{4}$/.test(newPin)) return;
-    if (setPin(newPin)) {
+  const handlePinSave = async () => {
+    setPinError('');
+    if (!/^\d{4}$/.test(newPin)) {
+      setPinError('新しいPINは4桁の数字で');
+      return;
+    }
+    try {
+      await mentorApi.changePin({
+        pin: oldPinInput || undefined,
+        newPin,
+      });
       setPinSaved(true);
       setNewPin('');
+      setOldPinInput('');
       setTimeout(() => {
         setPinSaved(false);
         setPinChangeMode(false);
       }, 1500);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        setPinError('現在のPINが違うか、セッションが切れています');
+      } else {
+        setPinError(`保存に失敗 (${e.message})`);
+      }
     }
   };
 
   const handleCsvExport = () => {
-    const lines = ['hiragana,romaji_used,count'];
+    const lines = ['student,character,mode,count,last_at'];
+    const studentName = students.find((s) => s.id === selectedStudentId)?.name ?? '';
     for (const m of mistakes) {
-      for (const [r, c] of Object.entries(m.byR)) {
-        lines.push(`${m.h},${r},${c}`);
-      }
+      lines.push(
+        `${studentName},${m.character},${m.mode},${m.count},${m.last_at}`
+      );
     }
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `romaji-karuta-mistakes-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `mistakes-${studentName || 'all'}-${new Date()
+      .toISOString()
+      .slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -96,57 +224,134 @@ export default function MentorMenu({ onClose }) {
         </div>
       </div>
 
-      {/* 3 カラム */}
+      {error && (
+        <div className="mb-4 px-4 py-2 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-bold">
+          {error}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* カラム1: 生徒選択（F11） — 1名運用想定のスタブ */}
+        {/* カラム1: 生徒選択 (F11) */}
         <section className="bg-white rounded-2xl p-6 border-2 border-orange-200">
           <h2 className="text-lg font-black text-orange-900 mb-4">生徒選択</h2>
-          <div className="bg-amber-50 rounded-xl px-3 py-2 mb-4 text-sm">
-            <span className="font-bold text-amber-700">現在: </span>
-            <span className="font-black text-orange-900">たろう</span>
+
+          <div className="flex flex-col gap-2 mb-3">
+            {students.length === 0 ? (
+              <p className="text-sm text-slate-400 py-3">生徒がいません</p>
+            ) : (
+              students.map((s) => {
+                const selected = s.id === selectedStudentId;
+                return (
+                  <div
+                    key={s.id}
+                    className={[
+                      'flex items-center gap-2 px-3 py-2 rounded-xl border',
+                      selected
+                        ? 'border-orange-500 bg-orange-50'
+                        : 'border-orange-100 bg-white',
+                    ].join(' ')}
+                  >
+                    <button
+                      onClick={() => setSelectedStudentId(s.id)}
+                      className="flex items-center gap-2 flex-1 text-left"
+                    >
+                      {selected ? (
+                        <CircleCheck className="w-4 h-4 text-orange-500" />
+                      ) : (
+                        <Circle className="w-4 h-4 text-slate-300" />
+                      )}
+                      <span className="font-bold text-orange-900">{s.name}</span>
+                      <span className="ml-auto text-xs text-amber-600">
+                        {s.points} pt
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteStudent(s.id)}
+                      className="text-slate-300 hover:text-red-500 transition-colors"
+                      aria-label="削除"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })
+            )}
           </div>
-          <p className="text-xs text-amber-700 font-bold">
-            複数生徒の管理は今後追加予定です。
-            <br />
-            今は 1 名運用です。
-          </p>
+
+          {addOpen ? (
+            <div className="flex flex-col gap-2 mt-2">
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="例: はなこ"
+                maxLength={20}
+                className="px-3 py-2 rounded-xl border-2 border-orange-300 font-bold"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setAddOpen(false);
+                    setNewName('');
+                  }}
+                  className="flex-1 py-2 rounded-xl border-2 border-slate-300 text-slate-500 text-sm font-bold flex items-center justify-center gap-1"
+                >
+                  <X className="w-4 h-4" />
+                  キャンセル
+                </button>
+                <button
+                  disabled={adding || !newName.trim()}
+                  onClick={handleAddStudent}
+                  className="flex-1 py-2 rounded-xl bg-orange-500 text-white text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-1"
+                >
+                  <Check className="w-4 h-4" />
+                  追加
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAddOpen(true)}
+              className="mt-2 w-full py-2 rounded-xl border-2 border-dashed border-blue-400 text-blue-600 text-sm font-bold flex items-center justify-center gap-2"
+            >
+              <UserPlus className="w-4 h-4" />
+              生徒を追加
+            </button>
+          )}
         </section>
 
-        {/* カラム2: 苦手な文字（F8） */}
+        {/* カラム2: 苦手な文字 (F8) */}
         <section className="bg-white rounded-2xl p-6 border-2 border-orange-200">
           <div className="flex items-center gap-2 mb-3">
             <Target className="w-5 h-5 text-orange-500" />
             <h2 className="text-lg font-black text-orange-900">苦手な文字</h2>
           </div>
           <p className="text-xs text-amber-700 font-bold mb-4">
-            よく間違える文字 (訓令式 / ヘボン式)
+            {students.find((s) => s.id === selectedStudentId)?.name ?? '—'} の記録
           </p>
-          {mistakes.length === 0 ? (
+          {mistakesLoading ? (
+            <p className="text-sm text-slate-400 py-3">読み込み中…</p>
+          ) : mistakes.length === 0 ? (
             <p className="text-sm text-slate-400 py-6 text-center">
               まだ記録がありません
             </p>
           ) : (
             <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
-              {mistakes.slice(0, 10).map((m) => {
-                const rDisplay = Object.entries(m.byR)
-                  .map(([r, c]) => `${r}×${c}`)
-                  .join(' / ');
-                return (
-                  <div
-                    key={m.h}
-                    className="flex items-center gap-3 px-3 py-2 bg-amber-50 rounded-xl"
-                  >
-                    <span className="text-2xl font-black text-orange-900">{m.h}</span>
-                    <span className="text-xs text-amber-700">→</span>
-                    <span className="text-sm font-bold text-orange-700">
-                      {rDisplay}
-                    </span>
-                    <span className="ml-auto px-2 py-0.5 rounded-lg bg-red-100 text-red-700 text-xs font-black">
-                      ×{m.count}
-                    </span>
-                  </div>
-                );
-              })}
+              {mistakes.slice(0, 15).map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center gap-3 px-3 py-2 bg-amber-50 rounded-xl"
+                >
+                  <span className="text-2xl font-black text-orange-900">
+                    {m.character}
+                  </span>
+                  <span className="text-xs px-2 py-0.5 rounded bg-orange-100 text-orange-700 font-bold">
+                    {m.mode}
+                  </span>
+                  <span className="ml-auto px-2 py-0.5 rounded-lg bg-red-100 text-red-700 text-xs font-black">
+                    ×{m.count}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
           {mistakes.length > 0 && (
@@ -187,20 +392,37 @@ export default function MentorMenu({ onClose }) {
 
           {pinChangeMode ? (
             <div className="flex flex-col gap-2">
-              <p className="text-sm font-bold text-orange-900">新しいPIN (4桁)</p>
+              <p className="text-sm font-bold text-orange-900">PIN変更</p>
+              <input
+                inputMode="numeric"
+                pattern="\d{4}"
+                maxLength={4}
+                value={oldPinInput}
+                onChange={(e) =>
+                  setOldPinInput(e.target.value.replace(/\D/g, ''))
+                }
+                placeholder="現在のPIN (省略可)"
+                className="px-3 py-2 rounded-xl border border-orange-200 text-base text-center font-bold tracking-widest"
+              />
               <input
                 inputMode="numeric"
                 pattern="\d{4}"
                 maxLength={4}
                 value={newPin}
                 onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+                placeholder="新しいPIN (4桁)"
                 className="px-3 py-2 rounded-xl border-2 border-orange-300 text-lg text-center font-bold tracking-widest"
               />
+              {pinError && (
+                <p className="text-xs text-red-500 font-bold">{pinError}</p>
+              )}
               <div className="flex gap-2">
                 <button
                   onClick={() => {
                     setPinChangeMode(false);
                     setNewPin('');
+                    setOldPinInput('');
+                    setPinError('');
                   }}
                   className="flex-1 py-2 rounded-xl border-2 border-slate-300 text-slate-500 text-sm font-bold"
                 >

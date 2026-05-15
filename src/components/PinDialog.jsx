@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Lock, Delete, Check } from 'lucide-react';
-import { verifyPin } from '../lib/settingsStorage.js';
+import { login } from '../lib/api/mentor.js';
+import { ApiError } from '../lib/apiClient.js';
 
 // PIN 入力ダイアログ（メンター画面の入口）。
-//   ロゴ長押しで開く。4 桁のテンキー入力で verify する。
+//   ロゴ長押しで開く。POST /api/auth/mentor で検証し、成功するとセッション
+//   Cookie が発行されて以降の認証 API がそのまま通る。
 //
 // props:
 //   onSuccess: () => void — PIN 認証成功時に呼ばれる
@@ -11,22 +13,34 @@ import { verifyPin } from '../lib/settingsStorage.js';
 export default function PinDialog({ onSuccess, onCancel }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (value) => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await login(value);
+      onSuccess?.();
+    } catch (e) {
+      // 401 は PIN 不一致、その他はネットワーク等。どちらもユーザ向けには「ちがうみたい」表示
+      if (!(e instanceof ApiError)) {
+        // unexpected
+      }
+      setError(true);
+      setPin('');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleDigit = (d) => {
-    if (pin.length >= 4) return;
+    if (pin.length >= 4 || submitting) return;
     setError(false);
     const next = pin + d;
     setPin(next);
     if (next.length === 4) {
-      // 軽い遅延を入れて、4 つ目のドットが点灯した状態を見せてから判定
-      setTimeout(() => {
-        if (verifyPin(next)) {
-          onSuccess?.();
-        } else {
-          setError(true);
-          setPin('');
-        }
-      }, 200);
+      // 4 つ目のドットが点灯した状態を一瞬見せてから verify
+      setTimeout(() => submit(next), 200);
     }
   };
 
@@ -38,11 +52,13 @@ export default function PinDialog({ onSuccess, onCancel }) {
   const dotClass = (filled) =>
     [
       'w-12 h-14 rounded-xl border-2 flex items-center justify-center transition-colors',
-      filled ? 'border-orange-500 bg-orange-50' : 'border-orange-200 bg-orange-50/50',
+      filled
+        ? 'border-orange-500 bg-orange-50'
+        : 'border-orange-200 bg-orange-50/50',
     ].join(' ');
 
   const keyClass =
-    'w-20 h-16 rounded-2xl bg-orange-50 border-2 border-orange-200 text-2xl font-bold text-orange-900 active:translate-y-1 active:bg-orange-100 transition-all';
+    'w-20 h-16 rounded-2xl bg-orange-50 border-2 border-orange-200 text-2xl font-bold text-orange-900 active:translate-y-1 active:bg-orange-100 transition-all disabled:opacity-50';
 
   return (
     <div
@@ -79,6 +95,7 @@ export default function PinDialog({ onSuccess, onCancel }) {
             <button
               key={n}
               type="button"
+              disabled={submitting}
               onClick={() => handleDigit(String(n))}
               className={keyClass}
             >
@@ -87,14 +104,16 @@ export default function PinDialog({ onSuccess, onCancel }) {
           ))}
           <button
             type="button"
+            disabled={submitting}
             onClick={handleDelete}
-            className="w-20 h-16 rounded-2xl bg-amber-100 border-2 border-amber-300 text-amber-900 active:translate-y-1 transition-all flex items-center justify-center"
+            className="w-20 h-16 rounded-2xl bg-amber-100 border-2 border-amber-300 text-amber-900 active:translate-y-1 transition-all flex items-center justify-center disabled:opacity-50"
             aria-label="削除"
           >
             <Delete className="w-7 h-7" />
           </button>
           <button
             type="button"
+            disabled={submitting}
             onClick={() => handleDigit('0')}
             className={keyClass}
           >
@@ -102,14 +121,8 @@ export default function PinDialog({ onSuccess, onCancel }) {
           </button>
           <button
             type="button"
-            disabled={pin.length !== 4}
-            onClick={() => {
-              if (verifyPin(pin)) onSuccess?.();
-              else {
-                setError(true);
-                setPin('');
-              }
-            }}
+            disabled={pin.length !== 4 || submitting}
+            onClick={() => submit(pin)}
             className="w-20 h-16 rounded-2xl bg-orange-500 border-2 border-orange-700 text-white active:translate-y-1 transition-all flex items-center justify-center disabled:opacity-50"
             aria-label="OK"
           >

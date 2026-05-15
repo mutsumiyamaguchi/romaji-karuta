@@ -3,7 +3,7 @@ import { romajiList } from '../data/romaji.js';
 import { shuffle } from '../lib/shuffle.js';
 import { useRevenge } from '../lib/useRevenge.js';
 import { MODES, pickRomaji } from '../lib/mode.js';
-import { recordMistake } from '../lib/mistakesStorage.js';
+import { recordMistake } from '../lib/api/mistakes.js';
 import Play from './Play.jsx';
 
 // 選択肢（札）の生成
@@ -22,28 +22,15 @@ const generateChoices = (correctItem) => {
 
 // プレイ画面のコンテナ
 //
-// 役割:
-//   - useRevenge による問題進行管理（即時 / サマリー リベンジ）
-//   - 札のスコア・選択肢生成・フィードバックタイマー管理
-//   - メイン → サマリーフェーズ遷移時の「もういっかい！」演出（1.5秒）
-//   - 全問終了で onFinished(mistakes) を発火
-//
-// 既存の Play.jsx は presentational なまま（props 駆動）維持し、
-// このコンテナが Play へ必要な props をすべて渡す。
-//
 // props:
-//   initialQuestions: 出題する問題の初期セット（App.startGame で確定したもの）
-//   points: 現在の累計ポイント（表示用）
-//   mode: 'h2r' | 'r2h' | 'H2R'
-//   revengeOptions: { immediate, summary }
-//   onFinished: (mistakes: Question[]) => void  — 全問終了時。getMistakeSummary の結果を渡す
-//   onPointsChange: (delta: number) => void     — 正解で +10 が発生したとき
-//   onBack: () => void                          — もどるボタン
+//   initialQuestions, points, mode, revengeOptions, onFinished, onPointsChange, onBack: 既存通り
+//   studentId: 現在の生徒 ID。recordMistake API を呼ぶときの subject。
 export default function PlayContainer({
   initialQuestions,
   points,
   mode = MODES.h2r,
   revengeOptions,
+  studentId,
   onFinished,
   onPointsChange,
   onBack,
@@ -153,12 +140,13 @@ export default function PlayContainer({
   const handleIncorrect = () => {
     setIsAnimating(true);
     setFeedback('incorrect');
-    // F8: そにもつリストへの記録（表示中の displayR を含めて記録）
-    if (revenge.currentQuestion) {
-      const correctChoice = choices.find((c) => c.h === revenge.currentQuestion.h);
-      recordMistake({
-        h: revenge.currentQuestion.h,
-        displayR: correctChoice?.displayR,
+    // F8: そにもつリストへの記録（fire-and-forget）
+    if (studentId && revenge.currentQuestion) {
+      recordMistake(studentId, {
+        character: revenge.currentQuestion.h,
+        mode,
+      }).catch(() => {
+        // 失敗は静かに無視（プレイは継続）
       });
     }
     advanceAfterFeedback(false);
