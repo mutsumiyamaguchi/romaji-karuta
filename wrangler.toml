@@ -2,17 +2,14 @@ name = "romaji-karuta"
 compatibility_date = "2026-05-13"
 pages_build_output_dir = "dist"
 
-# --------------------------------------------------------------------
-# D1 / 環境変数の設定（D1 移行フェーズで有効化）
-#
-# 当面は localStorage 完結で公開するため、D1 バインディングはコメントアウトしてある。
-# 後日、生徒データ・ポイント・にがてリストを D1 化する際に下記を有効化する。
-#
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "romaji-karuta"
-# database_id = "FILL-IN-AFTER-WRANGLER-D1-CREATE"
-#
-# PIN ソルトは Cloudflare ダッシュボードの Pages > Settings > Environment variables で
-# PIN_SALT として登録する（本ファイルにはコミットしない）
-# --------------------------------------------------------------------
+[[d1_databases]]
+binding = "DB"
+database_name = "romaji-karuta"
+database_id = "8348c6c0-cc4e-4814-b1c1-e7d3cb4f0157"
+
+# 注意:
+# - PIN_SALT は本番では Cloudflare ダッシュボード (Pages > Settings > Environment variables) に
+#   登録する。ローカル開発は .dev.vars (gitignore 済) で別の値を使用する。
+# - migration の適用:
+#     ローカル: npx wrangler d1 migrations apply romaji-karuta --local
+#     本番:     npx wrangler d1 migrations apply romaji-karuta --remote
