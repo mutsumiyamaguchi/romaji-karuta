@@ -1,0 +1,18 @@
+name = "romaji-karuta"
+compatibility_date = "2026-05-13"
+pages_build_output_dir = "dist"
+
+# --------------------------------------------------------------------
+# D1 / 環境変数の設定（D1 移行フェーズで有効化）
+#
+# 当面は localStorage 完結で公開するため、D1 バインディングはコメントアウトしてある。
+# 後日、生徒データ・ポイント・にがてリストを D1 化する際に下記を有効化する。
+#
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "romaji-karuta"
+# database_id = "FILL-IN-AFTER-WRANGLER-D1-CREATE"
+#
+# PIN ソルトは Cloudflare ダッシュボードの Pages > Settings > Environment variables で
+# PIN_SALT として登録する（本ファイルにはコミットしない）
+# --------------------------------------------------------------------
