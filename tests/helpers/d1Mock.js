@@ -26,7 +26,7 @@
  * @param {{
  *   students?: Array<{id: string, name: string, points: number, created_at?: string}>,
  *   mistakes?: Array<{id: number, student_id: string, character: string, mode: string, count: number, last_at?: string}>,
- *   mentor_config?: {id: number, pin_hash: string, immediate_revenge?: number, summary_revenge?: number}
+ *   mentor_config?: {id: number, pin_hash: string}
  * }} [initial]
  */
 export function createD1Mock(initial = {}) {
