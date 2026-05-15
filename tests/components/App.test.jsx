@@ -1,102 +1,158 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, act, fireEvent } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+
+// App.jsx の async ブートフロー（D1 移行後）に対する統合テスト。
+//   - mentor/students API を vi.mock で差し替え、起動シーケンスを支配する
+//   - 3 つの画面（Loading / Error / Setup / Menu）への分岐を網羅する
+//
+// 設計判断:
+//   - apiClient.js の fetch をモックするのではなく、src/lib/api/* モジュール単位で
+//     vi.mock する。これにより HTTP レイヤの実装変更（fetch → axios 等）に
+//     テストが引きずられない。
+//   - vi.hoisted で mock 関数を巻き上げ、各テストで beforeEach に挙動を割り当てる。
+
+const { mocks } = vi.hoisted(() => ({
+  mocks: {
+    getStatus: vi.fn(),
+    listStudents: vi.fn(),
+    getPoints: vi.fn(),
+    addPoints: vi.fn(),
+    getWeakCharacters: vi.fn(),
+    listMistakes: vi.fn(),
+    recordMistake: vi.fn(),
+  },
+}));
+
+vi.mock('../../src/lib/api/mentor.js', () => ({
+  getStatus: mocks.getStatus,
+  initPin: vi.fn(),
+  login: vi.fn(),
+  changePin: vi.fn(),
+}));
+
+vi.mock('../../src/lib/api/students.js', () => ({
+  listStudents: mocks.listStudents,
+  createStudent: vi.fn(),
+  deleteStudent: vi.fn(),
+}));
+
+vi.mock('../../src/lib/api/points.js', () => ({
+  getPoints: mocks.getPoints,
+  addPoints: mocks.addPoints,
+}));
+
+vi.mock('../../src/lib/api/mistakes.js', () => ({
+  listMistakes: mocks.listMistakes,
+  recordMistake: mocks.recordMistake,
+  getWeakCharacters: mocks.getWeakCharacters,
+}));
+
+// モック宣言後に import（hoist された vi.mock が先に効くため動的 import は不要だが、
+// 念のため top-level import を使い、Vitest の hoist に任せる）
 import App from '../../src/App.jsx';
 
-// App コンポーネントの統合テスト
-//   - localStorage からのポイント初期化（useState lazy initializer の経路）
-//   - フィードバック中に「もどる」を押してもタイマーで結果画面に飛ばないことを保証
-//     （リベンジ実装前から仕様で守りたい挙動）
-
-// FIXME(d1-storage): App は async 起動 + fetch 依存になったため、これらの統合テストは
-// fetch モックと waitFor ベースで書き直す必要がある。Phase E で対応するまで一旦スキップ。
-describe.skip('<App />', () => {
+describe('<App /> async boot', () => {
   beforeEach(() => {
     localStorage.clear();
+    // デフォルトの振る舞いをリセット
+    for (const fn of Object.values(mocks)) fn.mockReset();
+    mocks.addPoints.mockResolvedValue({ id: 's1', points: 0 });
+    mocks.getWeakCharacters.mockResolvedValue([]);
+    mocks.listMistakes.mockResolvedValue([]);
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
+  it('shows the loading screen first, then SetupScreen when mentor is not initialized', async () => {
+    mocks.getStatus.mockResolvedValue(false);
+    mocks.listStudents.mockResolvedValue([]);
 
-  it('initializes points from localStorage on mount (no flicker through 0)', () => {
-    localStorage.setItem('romajiPoints', '250');
-    render(<App />);
-    // 初回レンダーから 250 ぽいんとが見える（useEffect 経由だと一瞬 0 が見える）
-    expect(screen.getByText('250 ぽいんと')).toBeInTheDocument();
-  });
-
-  it('shows 0 points when localStorage is empty', () => {
-    render(<App />);
-    expect(screen.getByText('0 ぽいんと')).toBeInTheDocument();
-  });
-
-  it('transitions to result screen when the play session finishes', () => {
-    vi.useFakeTimers();
     render(<App />);
 
-    // 「あ ぎょう」を開始（5 問構成）
-    fireEvent.click(screen.getByRole('button', { name: 'あ ぎょう' }));
-    expect(screen.getByText('これ なーんだ？')).toBeInTheDocument();
+    // 起動直後はローディング表示（async 解決前）
+    expect(screen.getByText('よみこみちゅう…')).toBeInTheDocument();
 
-    // 5 問を全て不正解で消化する（リベンジ即時 ON / サマリー ON のデフォルトでも、
-    // 不正解札を毎回押して進めていけば、最終的に onFinished が発火して 'result' に遷移する）
-    // 安全のため最大ループ回数を制限しつつ、結果画面が見えるまで繰り返す。
-    let safety = 30;
-    while (safety-- > 0 && screen.queryByText('おわり！') === null) {
-      // フィードバック中ではない場合のみ札をクリック
-      if (
-        screen.queryByText('せいかい！') === null &&
-        screen.queryByText('ざんねん！') === null &&
-        screen.queryByText(/もういっかい/) === null
-      ) {
-        // 札ボタン（小文字ローマ字）を 1 つクリック
-        const choiceButtons = screen
-          .getAllByRole('button')
-          .filter((b) => /^[a-z]+$/.test(b.textContent ?? ''));
-        if (choiceButtons.length > 0) {
-          fireEvent.click(choiceButtons[0]);
-        }
-      }
-      act(() => {
-        vi.advanceTimersByTime(2500);
-      });
-    }
-
-    // 最終的に結果画面が表示される
-    expect(screen.getByText('おわり！')).toBeInTheDocument();
-  });
-
-  it('does not flip to result screen when user goes back during feedback', () => {
-    vi.useFakeTimers();
-    render(<App />);
-
-    // 「あ ぎょう」を開始 → 1問目のひらがなが見える
-    fireEvent.click(screen.getByRole('button', { name: 'あ ぎょう' }));
-    expect(screen.getByText('これ なーんだ？')).toBeInTheDocument();
-
-    // 札ボタン（小文字ローマ字テキスト）を取得して 1 つクリック
-    const choiceButtons = screen
-      .getAllByRole('button')
-      .filter((b) => /^[a-z]+$/.test(b.textContent ?? ''));
-    expect(choiceButtons.length).toBeGreaterThan(0);
-    fireEvent.click(choiceButtons[0]);
-
-    // フィードバックが表示されている
-    const hasFeedback =
-      screen.queryByText('せいかい！') !== null ||
-      screen.queryByText('ざんねん！') !== null;
-    expect(hasFeedback).toBe(true);
-
-    // すぐに「もどる」を押す
-    fireEvent.click(screen.getByRole('button', { name: /もどる/ }));
-    // メニュー画面に戻った
-    expect(screen.getByText('れんしゅうする ぎょうを えらんでね！')).toBeInTheDocument();
-
-    // タイマーを進めても結果画面に飛ばない（タイマーがクリアされている）
-    act(() => {
-      vi.advanceTimersByTime(3000);
+    // ブート完了後は SetupScreen が出る
+    await waitFor(() => {
+      expect(screen.getByText('はじめてのセットアップ')).toBeInTheDocument();
     });
-    expect(screen.queryByText('おわり！')).not.toBeInTheDocument();
-    expect(screen.getByText('れんしゅうする ぎょうを えらんでね！')).toBeInTheDocument();
+    // ローディングは消えている
+    expect(screen.queryByText('よみこみちゅう…')).not.toBeInTheDocument();
+    // getPoints は呼ばれない（生徒が未確定なので）
+    expect(mocks.getPoints).not.toHaveBeenCalled();
+  });
+
+  it('shows SetupScreen when mentor is initialized but no students exist', async () => {
+    mocks.getStatus.mockResolvedValue(true);
+    mocks.listStudents.mockResolvedValue([]);
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('はじめてのセットアップ')).toBeInTheDocument();
+    });
+    // 生徒が居ない以上ポイント取得は走らない
+    expect(mocks.getPoints).not.toHaveBeenCalled();
+  });
+
+  it('shows Menu with the current student when setup is complete and students exist', async () => {
+    mocks.getStatus.mockResolvedValue(true);
+    mocks.listStudents.mockResolvedValue([
+      { id: 's1', name: 'たろう', points: 0 },
+      { id: 's2', name: 'はなこ', points: 50 },
+    ]);
+    mocks.getPoints.mockResolvedValue(120);
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('れんしゅうする ぎょうを えらんでね！')
+      ).toBeInTheDocument();
+    });
+
+    // Menu のタイトル
+    expect(screen.getByText('ローマじ かるた')).toBeInTheDocument();
+    // 現在の生徒名（バッジ）
+    expect(screen.getByText('たろう')).toBeInTheDocument();
+    // ポイントが反映されている（getPoints の戻り値）
+    expect(screen.getByText('120 ぽいんと')).toBeInTheDocument();
+    // 最初の生徒 ID が currentStudent に固定される（localStorage 経由）
+    expect(localStorage.getItem('romajiCurrentStudentId')).toBe('s1');
+    // 1人目の生徒を引数に getPoints が呼ばれている
+    expect(mocks.getPoints).toHaveBeenCalledWith('s1');
+  });
+
+  it('preserves the previously selected student from localStorage on boot', async () => {
+    localStorage.setItem('romajiCurrentStudentId', 's2');
+    mocks.getStatus.mockResolvedValue(true);
+    mocks.listStudents.mockResolvedValue([
+      { id: 's1', name: 'たろう', points: 0 },
+      { id: 's2', name: 'はなこ', points: 50 },
+    ]);
+    mocks.getPoints.mockResolvedValue(50);
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('はなこ')).toBeInTheDocument();
+    });
+    expect(screen.getByText('50 ぽいんと')).toBeInTheDocument();
+    expect(mocks.getPoints).toHaveBeenCalledWith('s2');
+  });
+
+  it('shows ErrorScreen when the boot API throws', async () => {
+    mocks.getStatus.mockRejectedValue(new Error('network down'));
+    mocks.listStudents.mockResolvedValue([]);
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('つながらない みたい')).toBeInTheDocument();
+    });
+    // 詳細メッセージも露出される（小さく表示）
+    expect(screen.getByText(/network down/)).toBeInTheDocument();
+    // 「もういちど」リトライボタンが存在する
+    expect(
+      screen.getByRole('button', { name: 'もういちど' })
+    ).toBeInTheDocument();
   });
 });
