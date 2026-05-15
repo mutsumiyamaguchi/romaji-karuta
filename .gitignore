@@ -22,3 +22,16 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# === R3O Works 内部管理ファイル（追跡しない） ===
+CLAUDE.md
+STATUS.md
+docs/
+.claude/
+
+# === Cloudflare / Wrangler ローカルファイル ===
+.wrangler/
+.dev.vars
+.env
+.env.local
+.env.*.local
