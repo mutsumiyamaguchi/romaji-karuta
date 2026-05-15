@@ -3,7 +3,7 @@
 import { json, errorJson, readJson } from '../http.js';
 import { requireMentor } from '../auth.js';
 
-const VALID_MODES = new Set(['h2r', 'r2h', 'H2R']);
+const VALID_MODES = new Set(['h2r', 'r2h']);
 
 /**
  * GET /api/students/:id/mistakes
@@ -27,7 +27,7 @@ export async function listMistakes({ env, params }) {
 
 /**
  * POST /api/students/:id/mistakes
- *   ボディ: { character: string, mode: 'h2r' | 'r2h' | 'H2R' }
+ *   ボディ: { character: string, mode: 'h2r' | 'r2h' }
  *   既存があれば count を +1、last_at を更新。なければ新規作成。
  */
 export async function recordMistake({ request, env, params }) {
@@ -41,7 +41,7 @@ export async function recordMistake({ request, env, params }) {
     return errorJson('character is required', 400);
   }
   if (!VALID_MODES.has(mode)) {
-    return errorJson('mode must be one of h2r, r2h, H2R', 400);
+    return errorJson('mode must be one of h2r, r2h', 400);
   }
   const student = await env.DB
     .prepare('SELECT id FROM students WHERE id = ?')

@@ -10,6 +10,9 @@ const makeChoices = () => [
   { h: 'な', r: 'na', row: 'な', rotation: 3 },
 ];
 
+// 既定 letterCase は 'upper' だが、本テストは 'lower' を明示して旧テスト
+// （小文字ローマ字を札に出していた頃）の挙動を保つ。
+// モード別 / letterCase 別の表示テストは PlayMode.test.jsx で別途網羅している。
 const baseProps = (overrides = {}) => ({
   currentQ: { h: 'か', r: 'ka', row: 'か' },
   currentQuestionIndex: 0,
@@ -21,6 +24,8 @@ const baseProps = (overrides = {}) => ({
   onCorrect: vi.fn(),
   onIncorrect: vi.fn(),
   onBack: vi.fn(),
+  mode: 'h2r',
+  letterCase: 'lower',
   ...overrides,
 });
 

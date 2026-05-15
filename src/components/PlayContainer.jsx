@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { romajiList } from '../data/romaji.js';
 import { shuffle } from '../lib/shuffle.js';
-import { MODES, pickRomaji } from '../lib/mode.js';
+import { MODES, LETTER_CASES, pickRomaji } from '../lib/mode.js';
 import { recordMistake } from '../lib/api/mistakes.js';
 import Play from './Play.jsx';
 
@@ -28,7 +28,8 @@ const generateChoices = (correctItem) => {
 // props:
 //   initialQuestions: 出題する問題の初期セット
 //   points: 表示用の累計ポイント
-//   mode: 'h2r' | 'r2h' | 'H2R'
+//   mode: 'h2r' | 'r2h'
+//   letterCase: 'upper' | 'lower'  アルファベット大小（mode と独立）
 //   studentId: そにもつ記録の宛先
 //   onFinished: (mistakes: Question[]) => void  全問終了時
 //   onPointsChange: (delta: number) => void     正解時。やり直しモードのときは App 側で score だけ増やすハンドラに差し替えられる。
@@ -37,6 +38,7 @@ export default function PlayContainer({
   initialQuestions,
   points,
   mode = MODES.h2r,
+  letterCase = LETTER_CASES.upper,
   studentId,
   onFinished,
   onPointsChange,
@@ -147,6 +149,7 @@ export default function PlayContainer({
       onIncorrect={handleIncorrect}
       onBack={handleBack}
       mode={mode}
+      letterCase={letterCase}
     />
   );
 }

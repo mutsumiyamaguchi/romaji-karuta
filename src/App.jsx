@@ -1,11 +1,25 @@
 import { useEffect, useState } from 'react';
 import { romajiList } from './data/romaji.js';
 import { shuffle } from './lib/shuffle.js';
-import { MODES } from './lib/mode.js';
+import { MODES, LETTER_CASES } from './lib/mode.js';
 import {
   getCurrentStudentId,
   setCurrentStudentId,
 } from './lib/currentStudent.js';
+
+// letterCase の永続化キー（romajiCurrentStudentId と同じ命名スタイル）
+const LETTER_CASE_KEY = 'romajiLetterCase';
+
+// localStorage から letterCase を読み込み。未保存 / SSR / 不正値は 'upper' に倒す。
+const readLetterCase = () => {
+  if (typeof window === 'undefined') return LETTER_CASES.upper;
+  try {
+    const v = window.localStorage.getItem(LETTER_CASE_KEY);
+    return v === LETTER_CASES.lower ? LETTER_CASES.lower : LETTER_CASES.upper;
+  } catch {
+    return LETTER_CASES.upper;
+  }
+};
 import * as studentsApi from './lib/api/students.js';
 import * as pointsApi from './lib/api/points.js';
 import * as mistakesApi from './lib/api/mistakes.js';
@@ -36,12 +50,25 @@ export default function App() {
   // 画面モード
   const [mode, setMode] = useState('menu'); // menu | playing | result | mentor
   const [playMode, setPlayMode] = useState(MODES.h2r);
+  const [letterCase, setLetterCase] = useState(() => readLetterCase());
+  const [gameLetterCase, setGameLetterCase] = useState(letterCase);
   const [pinOpen, setPinOpen] = useState(false);
   const [questions, setQuestions] = useState([]);
   const [score, setScore] = useState(0);
   const [earnedPoints, setEarnedPoints] = useState(0);
   const [lastMistakes, setLastMistakes] = useState([]);
   const [isRetry, setIsRetry] = useState(false);
+
+  // letterCase 変更 → localStorage に保存
+  const handleLetterCaseChange = (value) => {
+    if (value !== LETTER_CASES.upper && value !== LETTER_CASES.lower) return;
+    setLetterCase(value);
+    try {
+      window.localStorage.setItem(LETTER_CASE_KEY, value);
+    } catch {
+      // ignore
+    }
+  };
 
   // 起動時の初期化
   useEffect(() => {
@@ -81,7 +108,11 @@ export default function App() {
   }, []);
 
   // 通常ゲーム開始
-  const startGame = async (targetRow, selectedMode = MODES.h2r) => {
+  const startGame = async (
+    targetRow,
+    selectedMode = MODES.h2r,
+    selectedLetterCase = LETTER_CASES.upper
+  ) => {
     let qs;
     if (targetRow === 'random') {
       qs = shuffle([...romajiList]).slice(0, 15);
@@ -99,6 +130,7 @@ export default function App() {
       qs = romajiList.filter((it) => it.row === targetRow);
     }
     setPlayMode(selectedMode);
+    setGameLetterCase(selectedLetterCase);
     setQuestions(qs);
     setScore(0);
     setEarnedPoints(0);
@@ -240,6 +272,8 @@ export default function App() {
           onSelectStudent={handleSelectStudent}
           onStart={startGame}
           onMentorAccess={handleMentorAccess}
+          letterCase={letterCase}
+          onLetterCaseChange={handleLetterCaseChange}
         />
       )}
       {mode === 'playing' && (
@@ -247,6 +281,7 @@ export default function App() {
           initialQuestions={questions}
           points={points}
           mode={playMode}
+          letterCase={gameLetterCase}
           studentId={currentSid}
           isRetry={isRetry}
           onFinished={handleFinished}

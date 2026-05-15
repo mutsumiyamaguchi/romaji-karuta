@@ -155,4 +155,66 @@ describe('<App /> async boot', () => {
       screen.getByRole('button', { name: 'もういちど' })
     ).toBeInTheDocument();
   });
+
+  it('defaults letterCase to upper when localStorage has no saved value', async () => {
+    mocks.getStatus.mockResolvedValue(true);
+    mocks.listStudents.mockResolvedValue([
+      { id: 's1', name: 'たろう', points: 0 },
+    ]);
+    mocks.getPoints.mockResolvedValue(0);
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('ローマじ かるた')).toBeInTheDocument();
+    });
+
+    // 'ABC' トグルがアクティブ
+    const upperBtn = screen.getByText('ABC').closest('button');
+    const lowerBtn = screen.getByText('abc').closest('button');
+    expect(upperBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(lowerBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('restores letterCase from localStorage on boot', async () => {
+    localStorage.setItem('romajiLetterCase', 'lower');
+    mocks.getStatus.mockResolvedValue(true);
+    mocks.listStudents.mockResolvedValue([
+      { id: 's1', name: 'たろう', points: 0 },
+    ]);
+    mocks.getPoints.mockResolvedValue(0);
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('ローマじ かるた')).toBeInTheDocument();
+    });
+
+    const upperBtn = screen.getByText('ABC').closest('button');
+    const lowerBtn = screen.getByText('abc').closest('button');
+    expect(lowerBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(upperBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('persists letterCase to localStorage when the toggle is clicked', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    mocks.getStatus.mockResolvedValue(true);
+    mocks.listStudents.mockResolvedValue([
+      { id: 's1', name: 'たろう', points: 0 },
+    ]);
+    mocks.getPoints.mockResolvedValue(0);
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('ローマじ かるた')).toBeInTheDocument();
+    });
+
+    const lowerBtn = screen.getByText('abc').closest('button');
+    await user.click(lowerBtn);
+
+    expect(localStorage.getItem('romajiLetterCase')).toBe('lower');
+    expect(lowerBtn).toHaveAttribute('aria-pressed', 'true');
+  });
 });

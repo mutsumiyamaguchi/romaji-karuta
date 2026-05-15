@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Star, Flame, ChevronDown, User } from 'lucide-react';
 import { rows } from '../data/romaji.js';
-import { MODES, MODE_LABELS } from '../lib/mode.js';
+import {
+  MODES,
+  MODE_LABELS,
+  LETTER_CASES,
+  LETTER_CASE_LABELS,
+} from '../lib/mode.js';
 import { getWeakCharacters } from '../lib/api/mistakes.js';
 
 // ロゴ長押し（メンター画面の隠し導線）の発動時間
@@ -13,8 +18,10 @@ const LONG_PRESS_MS = 3000;
 //   currentStudent: { id, name } | null
 //   students: Array<{ id, name, points }>
 //   onSelectStudent: (id) => void
-//   onStart: (target, mode) => void
+//   onStart: (target, mode, letterCase) => void
 //   onMentorAccess: () => void — ロゴ長押し検知時（PINダイアログを開く）
+//   letterCase: 'upper' | 'lower' — アルファベット大小（親 App から渡される）
+//   onLetterCaseChange: (value) => void — letterCase 切替コールバック
 export default function Menu({
   points,
   currentStudent,
@@ -22,6 +29,8 @@ export default function Menu({
   onSelectStudent,
   onStart,
   onMentorAccess,
+  letterCase = LETTER_CASES.upper,
+  onLetterCaseChange,
 }) {
   const [mode, setMode] = useState(MODES.h2r);
   const [weakAvailable, setWeakAvailable] = useState(false);
@@ -50,7 +59,12 @@ export default function Menu({
     };
   }, [currentStudent?.id]);
 
-  const handleStart = (target) => onStart(target, mode);
+  const handleStart = (target) => onStart(target, mode, letterCase);
+
+  const handleLetterCaseClick = (next) => {
+    if (next === letterCase) return;
+    onLetterCaseChange?.(next);
+  };
 
   const startLongPress = () => {
     if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
@@ -70,6 +84,15 @@ export default function Menu({
   const tabClass = (isActive) =>
     [
       'flex-1 min-w-0 px-4 py-2.5 rounded-2xl font-bold text-sm sm:text-base transition-all',
+      isActive
+        ? 'bg-orange-500 text-white shadow-[0_3px_0_#c2410c]'
+        : 'bg-transparent text-orange-700',
+    ].join(' ');
+
+  // アルファベット大小トグルのクラス（モードタブと同じ視覚言語）
+  const caseToggleClass = (isActive) =>
+    [
+      'min-w-0 px-6 py-2 rounded-2xl font-bold text-sm sm:text-base transition-all',
       isActive
         ? 'bg-orange-500 text-white shadow-[0_3px_0_#c2410c]'
         : 'bg-transparent text-orange-700',
@@ -130,7 +153,7 @@ export default function Menu({
 
       {/* モードタブ */}
       <div
-        className="w-full max-w-2xl mb-6 p-1.5 bg-white rounded-full border-2 border-orange-200 flex gap-2"
+        className="w-full max-w-2xl mb-3 p-1.5 bg-white rounded-full border-2 border-orange-200 flex gap-2"
         role="tablist"
         aria-label="出題モード"
       >
@@ -146,6 +169,32 @@ export default function Menu({
             {MODE_LABELS[m]}
           </button>
         ))}
+      </div>
+
+      {/* アルファベット大小トグル */}
+      <div
+        className="w-full max-w-2xl mb-6 flex items-center justify-center gap-3"
+        aria-label="アルファベットの大きさ"
+      >
+        <span className="text-sm sm:text-base font-bold text-orange-700">
+          アルファベット
+        </span>
+        <div className="p-1.5 bg-white rounded-full border-2 border-orange-200 flex gap-2">
+          {Object.values(LETTER_CASES).map((c) => (
+            <button
+              key={c}
+              type="button"
+              aria-pressed={letterCase === c}
+              aria-label={
+                c === LETTER_CASES.upper ? 'おおもじ' : 'こもじ'
+              }
+              onClick={() => handleLetterCaseClick(c)}
+              className={caseToggleClass(letterCase === c)}
+            >
+              {LETTER_CASE_LABELS[c]}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ロゴ + キャプション（長押しでメンター） */}

@@ -1,6 +1,6 @@
 import { Star, Home } from 'lucide-react';
 import Feedback from './Feedback.jsx';
-import { MODES, getPrompt, getChoiceLabel } from '../lib/mode.js';
+import { MODES, LETTER_CASES, getPrompt, getChoiceLabel } from '../lib/mode.js';
 
 // プレイ画面（問題表示 + 選択肢 + フィードバックオーバーレイ）
 // props:
@@ -14,7 +14,8 @@ import { MODES, getPrompt, getChoiceLabel } from '../lib/mode.js';
 //   onCorrect: (choice) => void — 正解の札がクリックされた
 //   onIncorrect: (choice) => void — 不正解の札がクリックされた
 //   onBack: () => void — メニューに戻る
-//   mode: 'h2r' | 'r2h' | 'H2R' — 出題モード（既定 'h2r'）
+//   mode: 'h2r' | 'r2h' — 出題モード（既定 'h2r'）
+//   letterCase: 'upper' | 'lower' — アルファベット大小（既定 'upper'）
 export default function Play({
   currentQ,
   currentQuestionIndex,
@@ -27,6 +28,7 @@ export default function Play({
   onIncorrect,
   onBack,
   mode = MODES.h2r,
+  letterCase = LETTER_CASES.upper,
 }) {
   const handleChoiceClick = (choice) => {
     if (isAnimating) return;
@@ -46,14 +48,14 @@ export default function Play({
       : 'text-[12rem] leading-none font-black text-gray-800 drop-shadow-xl select-none';
 
   // 札（取り札）のテキストクラス
-  //   r2h はひらがなを大きく見せたい / H2R は大文字ローマ字
+  //   r2h はひらがな主体 / h2r はローマ字
   const choiceTextClass =
     mode === MODES.r2h
       ? 'text-6xl sm:text-8xl font-bold text-gray-800'
       : 'text-5xl sm:text-7xl font-bold text-gray-800';
 
   // フィードバック時に正解として表示する文字列
-  const correctChoiceText = getChoiceLabel(currentQ, mode);
+  const correctChoiceText = getChoiceLabel(currentQ, mode, letterCase);
 
   return (
     <div className="min-h-screen bg-green-50 flex flex-col items-center relative overflow-hidden font-sans">
@@ -90,7 +92,7 @@ export default function Play({
           これ なーんだ？
         </div>
         <div className={promptClass}>
-          {getPrompt(currentQ, mode)}
+          {getPrompt(currentQ, mode, letterCase)}
         </div>
       </div>
 
@@ -108,7 +110,7 @@ export default function Play({
               border-amber-500 shadow-[0_8px_0_#d97706] active:shadow-[0_0px_0_#d97706]
             `}
           >
-            {getChoiceLabel(choice, mode)}
+            {getChoiceLabel(choice, mode, letterCase)}
           </button>
         ))}
       </div>
