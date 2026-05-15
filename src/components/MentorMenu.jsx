@@ -36,6 +36,7 @@ export default function MentorMenu({
   const [selectedStudentId, setSelectedStudentId] = useState(currentStudentId);
   const [mistakes, setMistakes] = useState([]);
   const [mistakesLoading, setMistakesLoading] = useState(false);
+  const [clearingMistakes, setClearingMistakes] = useState(false);
 
   // 生徒追加
   const [addOpen, setAddOpen] = useState(false);
@@ -150,6 +151,33 @@ export default function MentorMenu({
       } else {
         setPinError(`保存に失敗 (${e.message})`);
       }
+    }
+  };
+
+  const handleClearMistakes = async () => {
+    if (!selectedStudentId) return;
+    if (
+      !confirm(
+        'この生徒の苦手な文字をすべて消します。元には戻せません。よろしいですか？'
+      )
+    )
+      return;
+    setError('');
+    setClearingMistakes(true);
+    try {
+      await mistakesApi.clearMistakes(selectedStudentId);
+      setMistakes([]);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        // Cookie セッション切れ。MentorMenu 内で PIN を入れ直す UI が無いため、
+        // メニューに戻してロゴ長押し → PinDialog の動線に乗せる。
+        alert('セッションが切れています。PINを入れ直してください');
+        onClose();
+        return;
+      }
+      setError(`全クリアに失敗 (${e.message})`);
+    } finally {
+      setClearingMistakes(false);
     }
   };
 
@@ -310,24 +338,34 @@ export default function MentorMenu({
               まだ記録がありません
             </p>
           ) : (
-            <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
-              {mistakes.slice(0, 15).map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-3 px-3 py-2 bg-amber-50 rounded-xl"
-                >
-                  <span className="text-2xl font-black text-orange-900">
-                    {m.character}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 rounded bg-orange-100 text-orange-700 font-bold">
-                    {m.mode}
-                  </span>
-                  <span className="ml-auto px-2 py-0.5 rounded-lg bg-red-100 text-red-700 text-xs font-black">
-                    ×{m.count}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <>
+              <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
+                {mistakes.slice(0, 15).map((m) => (
+                  <div
+                    key={m.id}
+                    className="flex items-center gap-3 px-3 py-2 bg-amber-50 rounded-xl"
+                  >
+                    <span className="text-2xl font-black text-orange-900">
+                      {m.character}
+                    </span>
+                    <span className="text-xs px-2 py-0.5 rounded bg-orange-100 text-orange-700 font-bold">
+                      {m.mode}
+                    </span>
+                    <span className="ml-auto px-2 py-0.5 rounded-lg bg-red-100 text-red-700 text-xs font-black">
+                      ×{m.count}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={handleClearMistakes}
+                disabled={clearingMistakes || !selectedStudentId}
+                className="mt-3 w-full py-2 rounded-xl border-2 border-red-300 text-red-600 text-sm font-bold flex items-center justify-center gap-2 active:translate-y-0.5 transition-all disabled:opacity-40"
+              >
+                <Trash2 className="w-4 h-4" />
+                {clearingMistakes ? 'クリア中…' : '全クリア'}
+              </button>
+            </>
           )}
         </section>
 
