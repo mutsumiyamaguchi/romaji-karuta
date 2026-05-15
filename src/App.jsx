@@ -30,12 +30,8 @@ export default function App() {
   const [currentSid, setCurrentSid] = useState(() => getCurrentStudentId());
   const currentStudent = students.find((s) => s.id === currentSid) ?? null;
 
-  // セッション・設定
+  // セッション
   const [points, setPoints] = useState(0);
-  const [revengeOptions, setRevengeOptions] = useState({
-    immediate: true,
-    summary: true,
-  });
 
   // 画面モード
   const [mode, setMode] = useState('menu'); // menu | playing | result | mentor
@@ -44,19 +40,19 @@ export default function App() {
   const [questions, setQuestions] = useState([]);
   const [score, setScore] = useState(0);
   const [earnedPoints, setEarnedPoints] = useState(0);
+  const [lastMistakes, setLastMistakes] = useState([]);
+  const [isRetry, setIsRetry] = useState(false);
 
   // 起動時の初期化
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const [initialized, list, config] = await Promise.all([
+        const [initialized, list] = await Promise.all([
           mentorApi.getStatus(),
           studentsApi.listStudents(),
-          mentorApi.getConfig(),
         ]);
         if (!alive) return;
-        setRevengeOptions(config);
         setStudents(list);
         if (!initialized || list.length === 0) {
           setNeedsSetup(true);
@@ -84,7 +80,7 @@ export default function App() {
     };
   }, []);
 
-  // ゲーム開始
+  // 通常ゲーム開始
   const startGame = async (targetRow, selectedMode = MODES.h2r) => {
     let qs;
     if (targetRow === 'random') {
@@ -106,26 +102,48 @@ export default function App() {
     setQuestions(qs);
     setScore(0);
     setEarnedPoints(0);
+    setLastMistakes([]);
+    setIsRetry(false);
+    setMode('playing');
+  };
+
+  // 間違えた問題だけで再プレイ（ノーポイント）
+  const handleRetryWrongOnly = () => {
+    if (lastMistakes.length === 0) return;
+    setQuestions(lastMistakes);
+    setScore(0);
+    setEarnedPoints(0);
+    setLastMistakes([]);
+    setIsRetry(true);
     setMode('playing');
   };
 
   // 正解時 (delta=10)。サーバ加算は楽観 UI で待たない。
+  // PlayContainer 側で isRetry 時はそもそも呼ばれない。
   const handlePointsChange = (delta) => {
     setScore((s) => s + 1);
     setEarnedPoints((p) => p + delta);
     setPoints((p) => p + delta);
     if (currentSid) {
-      pointsApi.addPoints(currentSid, delta).catch(() => {
-        // サーバ加算失敗は静かに無視（メニューに戻ったときに再取得で整合）
-      });
+      pointsApi.addPoints(currentSid, delta).catch(() => {});
     }
   };
 
-  const handleFinished = () => setMode('result');
+  // 再挑戦モードの正解カウント。ポイントは増やさない。
+  const handleRetryCorrect = () => {
+    setScore((s) => s + 1);
+  };
+
+  // PlayContainer から終了通知（mistakes を受け取る）
+  const handleFinished = (mistakes) => {
+    setLastMistakes(mistakes ?? []);
+    setMode('result');
+  };
 
   const goBackToMenu = async () => {
+    setIsRetry(false);
+    setLastMistakes([]);
     setMode('menu');
-    // セッションのポイントとサーバの点数を整合させる（加算失敗があった場合）
     if (currentSid) {
       try {
         const p = await pointsApi.getPoints(currentSid);
@@ -142,14 +160,9 @@ export default function App() {
     setMode('mentor');
   };
   const handleMentorClose = async () => {
-    // 生徒削除/追加 / 設定変更 / PIN変更 の可能性 → 全部リフレッシュ
     try {
-      const [list, config] = await Promise.all([
-        studentsApi.listStudents(),
-        mentorApi.getConfig(),
-      ]);
+      const list = await studentsApi.listStudents();
       setStudents(list);
-      setRevengeOptions(config);
       let sid = currentSid;
       if (!list.some((s) => s.id === sid)) {
         sid = list[0]?.id ?? null;
@@ -181,7 +194,6 @@ export default function App() {
   };
 
   const handleSetupComplete = async () => {
-    // セットアップ画面で initPin + createStudent が完了している前提でリロード
     try {
       const list = await studentsApi.listStudents();
       setStudents(list);
@@ -213,7 +225,6 @@ export default function App() {
       <MentorMenu
         students={students}
         currentStudentId={currentSid}
-        revengeOptions={revengeOptions}
         onClose={handleMentorClose}
       />
     );
@@ -236,10 +247,10 @@ export default function App() {
           initialQuestions={questions}
           points={points}
           mode={playMode}
-          revengeOptions={revengeOptions}
           studentId={currentSid}
+          isRetry={isRetry}
           onFinished={handleFinished}
-          onPointsChange={handlePointsChange}
+          onPointsChange={isRetry ? handleRetryCorrect : handlePointsChange}
           onBack={goBackToMenu}
         />
       )}
@@ -248,7 +259,10 @@ export default function App() {
           score={score}
           questions={questions}
           earnedPoints={earnedPoints}
+          mistakes={lastMistakes}
+          isRetry={isRetry}
           onBack={goBackToMenu}
+          onRetryWrongOnly={handleRetryWrongOnly}
         />
       )}
       {pinOpen && (
