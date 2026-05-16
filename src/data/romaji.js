@@ -16,7 +16,7 @@ export const romajiList = [
   { h: 'ま', r: 'ma', row: 'ま' }, { h: 'み', r: 'mi', row: 'ま' }, { h: 'む', r: 'mu', row: 'ま' }, { h: 'め', r: 'me', row: 'ま' }, { h: 'も', r: 'mo', row: 'ま' },
   { h: 'や', r: 'ya', row: 'や' }, { h: 'ゆ', r: 'yu', row: 'や' }, { h: 'よ', r: 'yo', row: 'や' },
   { h: 'ら', r: 'ra', row: 'ら' }, { h: 'り', r: 'ri', row: 'ら' }, { h: 'る', r: 'ru', row: 'ら' }, { h: 'れ', r: 're', row: 'ら' }, { h: 'ろ', r: 'ro', row: 'ら' },
-  { h: 'わ', r: 'wa', row: 'わ' }, { h: 'を', r: 'wo', row: 'わ' }, { h: 'ん', r: 'n', row: 'わ' }
+  { h: 'わ', r: 'wa', row: 'わ' }, { h: 'うぃ', r: 'wi', row: 'わ' }, { h: 'うぇ', r: 'we', row: 'わ' }, { h: 'を', r: 'wo', row: 'わ' }, { h: 'ん', r: 'nn', row: 'わ' }
 ];
 
 export const rows = ['あ', 'か', 'さ', 'た', 'な', 'は', 'ま', 'や', 'ら', 'わ'];

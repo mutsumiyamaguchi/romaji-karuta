@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { romajiList, rows } from '../../src/data/romaji.js';
 
 describe('romajiList', () => {
-  it('contains exactly 46 entries (清音 + ん)', () => {
-    expect(romajiList).toHaveLength(46);
+  it('contains exactly 48 entries (清音 + ん + うぃ/うぇ)', () => {
+    expect(romajiList).toHaveLength(48);
   });
 
   it('has unique hiragana keys', () => {
@@ -41,8 +41,10 @@ describe('romajiList', () => {
       { h: 'や', r: 'ya', row: 'や' },
       { h: 'ら', r: 'ra', row: 'ら' },
       { h: 'わ', r: 'wa', row: 'わ' },
+      { h: 'うぃ', r: 'wi', row: 'わ' },
+      { h: 'うぇ', r: 'we', row: 'わ' },
       { h: 'を', r: 'wo', row: 'わ' },
-      { h: 'ん', r: 'n', row: 'わ' },
+      { h: 'ん', r: 'nn', row: 'わ' },
     ];
     for (const e of expected) {
       expect(romajiList).toContainEqual(e);
@@ -62,9 +64,9 @@ describe('romajiList', () => {
     expect(yaRow.map(item => item.h)).toEqual(['や', 'ゆ', 'よ']);
   });
 
-  it('わ row has exactly 3 entries (わ/を/ん)', () => {
+  it('わ row has exactly 5 entries (わ/うぃ/うぇ/を/ん)', () => {
     const waRow = romajiList.filter(item => item.row === 'わ');
-    expect(waRow.map(item => item.h)).toEqual(['わ', 'を', 'ん']);
+    expect(waRow.map(item => item.h)).toEqual(['わ', 'うぃ', 'うぇ', 'を', 'ん']);
   });
 });
 
