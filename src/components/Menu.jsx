@@ -1,6 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
 import { Star, Flame, ChevronDown, User } from 'lucide-react';
-import { rows } from '../data/romaji.js';
+import { rows, romajiList, STEPS } from '../data/romaji.js';
+
+// ステップ別ボタンの表示メタ。
+// 件数表示はデータから動的に計算する（データ変更時に追従させるため）。
+const STEP_BUTTONS = [
+  {
+    step: STEPS.seion,
+    target: 'random-seion',
+    title: 'ステップ1',
+    subtitle: 'せいおん',
+  },
+  {
+    step: STEPS.dakuon,
+    target: 'random-dakuon',
+    title: 'ステップ2',
+    subtitle: 'だくおん・はんだくおん',
+  },
+  {
+    step: STEPS.youon,
+    target: 'random-youon',
+    title: 'ステップ3',
+    subtitle: 'ようおん',
+  },
+];
+
+const STEP_COUNTS = STEP_BUTTONS.reduce((acc, b) => {
+  acc[b.step] = romajiList.filter((it) => it.step === b.step).length;
+  return acc;
+}, {});
 import {
   MODES,
   MODE_LABELS,
@@ -227,16 +255,26 @@ export default function Menu({
         ))}
       </div>
 
-      <div className="w-full max-w-2xl flex flex-col sm:flex-row gap-4 justify-center">
-        <button
-          onClick={() => handleStart('random')}
-          className="flex-1 bg-gradient-to-r from-red-400 to-pink-500 border-4 border-pink-600 rounded-3xl py-5 shadow-[0_8px_0_#be185d] active:shadow-[0_0px_0_#be185d] active:translate-y-2 transition-all flex flex-col items-center justify-center text-white"
-        >
-          <span className="text-2xl sm:text-3xl font-black mb-1">ぜんぶ まぜまぜ</span>
-          <span className="text-sm font-bold bg-white/30 px-3 py-1 rounded-full">
-            ランダム 15もん
-          </span>
-        </button>
+      {/* ランダム 15問 ステップ別ボタン（清音 / 濁音半濁音 / 拗音） */}
+      <div className="w-full max-w-3xl grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4">
+        {STEP_BUTTONS.map((b) => (
+          <button
+            key={b.step}
+            onClick={() => handleStart(b.target)}
+            className="bg-gradient-to-r from-red-400 to-pink-500 border-4 border-pink-600 rounded-3xl py-5 shadow-[0_8px_0_#be185d] active:shadow-[0_0px_0_#be185d] active:translate-y-2 transition-all flex flex-col items-center justify-center text-white"
+          >
+            <span className="text-base sm:text-lg font-bold bg-white/25 px-3 py-0.5 rounded-full mb-1">
+              {b.title}
+            </span>
+            <span className="text-xl sm:text-2xl font-black mb-1">{b.subtitle}</span>
+            <span className="text-xs sm:text-sm font-bold bg-white/30 px-3 py-1 rounded-full">
+              {STEP_COUNTS[b.step]}もん から 15もん
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="w-full max-w-2xl flex justify-center">
         <button
           onClick={() => weakAvailable && handleStart('weak')}
           disabled={!weakAvailable}

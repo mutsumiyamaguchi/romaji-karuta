@@ -28,14 +28,39 @@ describe('<Menu />', () => {
     expect(onStart.mock.calls[0][0]).toBe('あ');
   });
 
-  it('calls onStart with "random" when the ぜんぶ まぜまぜ button is clicked', async () => {
+  it('calls onStart with "random-seion" when the ステップ1 せいおん button is clicked', async () => {
     const onStart = vi.fn();
     const user = userEvent.setup();
     render(<Menu points={0} onStart={onStart} />);
 
-    await user.click(screen.getByText('ぜんぶ まぜまぜ'));
+    await user.click(screen.getByText('せいおん').closest('button'));
     expect(onStart).toHaveBeenCalled();
-    expect(onStart.mock.calls[0][0]).toBe('random');
+    expect(onStart.mock.calls[0][0]).toBe('random-seion');
+  });
+
+  it('renders three step buttons (seion / dakuon / youon)', () => {
+    render(<Menu points={0} onStart={() => {}} />);
+    expect(screen.getByText('せいおん')).toBeInTheDocument();
+    expect(screen.getByText('だくおん・はんだくおん')).toBeInTheDocument();
+    expect(screen.getByText('ようおん')).toBeInTheDocument();
+  });
+
+  it('calls onStart with "random-dakuon" when the ステップ2 button is clicked', async () => {
+    const onStart = vi.fn();
+    const user = userEvent.setup();
+    render(<Menu points={0} onStart={onStart} />);
+
+    await user.click(screen.getByText('だくおん・はんだくおん').closest('button'));
+    expect(onStart.mock.calls[0][0]).toBe('random-dakuon');
+  });
+
+  it('calls onStart with "random-youon" when the ステップ3 button is clicked', async () => {
+    const onStart = vi.fn();
+    const user = userEvent.setup();
+    render(<Menu points={0} onStart={onStart} />);
+
+    await user.click(screen.getByText('ようおん').closest('button'));
+    expect(onStart.mock.calls[0][0]).toBe('random-youon');
   });
 
   it('shows the title and prompt copy', () => {

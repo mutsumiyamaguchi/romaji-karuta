@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { romajiList } from './data/romaji.js';
+import { romajiList, STEPS } from './data/romaji.js';
 import { shuffle } from './lib/shuffle.js';
 import { MODES, LETTER_CASES } from './lib/mode.js';
 import {
@@ -114,7 +114,20 @@ export default function App() {
     selectedLetterCase = LETTER_CASES.upper
   ) => {
     let qs;
-    if (targetRow === 'random') {
+    // ステップ別ランダム 15 問: 各 step から 15 問抽出
+    const stepForTarget =
+      targetRow === 'random-seion'
+        ? STEPS.seion
+        : targetRow === 'random-dakuon'
+          ? STEPS.dakuon
+          : targetRow === 'random-youon'
+            ? STEPS.youon
+            : null;
+    if (stepForTarget) {
+      const pool = romajiList.filter((it) => it.step === stepForTarget);
+      qs = shuffle(pool).slice(0, 15);
+    } else if (targetRow === 'random') {
+      // 後方互換: 全文字からのランダム（旧 UI 名残り用）
       qs = shuffle([...romajiList]).slice(0, 15);
     } else if (targetRow === 'weak') {
       try {
