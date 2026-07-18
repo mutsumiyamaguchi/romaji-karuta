@@ -28,6 +28,7 @@ CLAUDE.md
 STATUS.md
 docs/
 .claude/
+.superpowers/
 
 # === Cloudflare / Wrangler ローカルファイル ===
 .wrangler/
