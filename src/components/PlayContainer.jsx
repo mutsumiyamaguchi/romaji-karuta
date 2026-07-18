@@ -1,23 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { romajiList } from '../data/romaji.js';
-import { shuffle } from '../lib/shuffle.js';
-import { MODES, LETTER_CASES, pickRomaji } from '../lib/mode.js';
+import { generateChoices } from '../lib/choices.js';
+import { MODES, LETTER_CASES } from '../lib/mode.js';
 import { recordMistake } from '../lib/api/mistakes.js';
 import Play from './Play.jsx';
-
-// 選択肢（札）の生成
-//   正解 + ランダムな不正解 3 つを混ぜ、それぞれにカルタっぽい傾きを付与。
-//   alts を持つ文字（し: si/shi など）は displayR をここで固定し、
-//   セッション中に表示が揺れないようにする。
-const generateChoices = (correctItem) => {
-  const others = romajiList.filter((item) => item.r !== correctItem.r);
-  const shuffledOthers = shuffle(others).slice(0, 3);
-  return shuffle([correctItem, ...shuffledOthers]).map((c) => ({
-    ...c,
-    rotation: Math.floor(Math.random() * 12) - 6,
-    displayR: pickRomaji(c),
-  }));
-};
 
 // プレイ画面のコンテナ
 //
