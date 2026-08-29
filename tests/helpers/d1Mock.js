@@ -31,8 +31,16 @@
  */
 export function createD1Mock(initial = {}) {
   const state = {
-    students: [...(initial.students ?? [])],
+    students: (initial.students ?? []).map((student) => ({
+      ...student,
+      total_points: student.total_points ?? student.points ?? 0,
+      available_points: student.available_points ?? student.points ?? 0,
+      legacy_full_access: student.legacy_full_access ?? 1,
+    })),
     mistakes: [...(initial.mistakes ?? [])],
+    practice_completions: [...(initial.practice_completions ?? [])],
+    assessment_progress: [...(initial.assessment_progress ?? [])],
+    assessment_answers: [...(initial.assessment_answers ?? [])],
     mentor_config: initial.mentor_config ?? null,
     _mistakesAutoId: (initial.mistakes ?? []).reduce(
       (max, m) => Math.max(max, m.id ?? 0),
@@ -86,7 +94,7 @@ class PreparedStatement {
     if (/^INSERT\s+INTO\s+students/i.test(sql)) {
       const [id, name] = p;
       const created_at = nowIso();
-      this._state.students.push({ id, name, points: 0, created_at });
+      this._state.students.push({ id, name, points: 0, total_points: 0, available_points: 0, legacy_full_access: 0, created_at });
       return returnMeta
         ? { success: true, meta: { changes: 1 } }
         : [];
@@ -144,6 +152,15 @@ class PreparedStatement {
       return returnMeta ? { success: true, meta: { changes } } : [];
     }
 
+    const childDelete = sql.match(/^DELETE\s+FROM\s+(practice_completions|assessment_progress|assessment_answers)\s+WHERE\s+student_id\s*=\s*\?/i);
+    if (childDelete) {
+      const key = childDelete[1].toLowerCase();
+      const [student_id] = p;
+      const before = this._state[key].length;
+      this._state[key] = this._state[key].filter((row) => row.student_id !== student_id);
+      return returnMeta ? { success: true, meta: { changes: before - this._state[key].length } } : [];
+    }
+
     // ---- DELETE students by id ----
     if (/^DELETE\s+FROM\s+students\s+WHERE\s+id\s*=\s*\?/i.test(sql)) {
       const [id] = p;
@@ -162,6 +179,11 @@ class PreparedStatement {
     }
 
     // ---- SELECT student by id (with points) ----
+    if (/SELECT\s+id,\s*total_points,\s*available_points\s+FROM\s+students\s+WHERE\s+id\s*=\s*\?/i.test(sql)) {
+      const [id] = p;
+      const s = this._state.students.find((x) => x.id === id);
+      return s ? [{ id: s.id, total_points: s.total_points, available_points: s.available_points }] : [];
+    }
     if (/SELECT\s+id,\s*points\s+FROM\s+students\s+WHERE\s+id\s*=\s*\?/i.test(sql)) {
       const [id] = p;
       const s = this._state.students.find((x) => x.id === id);
@@ -169,6 +191,11 @@ class PreparedStatement {
     }
 
     // ---- SELECT student by id (full) ----
+    if (/SELECT\s+id,\s*name,\s*total_points\s+AS\s+points/i.test(sql) && /WHERE\s+id\s*=\s*\?/i.test(sql)) {
+      const [id] = p;
+      const s = this._state.students.find((x) => x.id === id);
+      return s ? [{ ...s, points: s.total_points }] : [];
+    }
     if (/SELECT\s+id,\s*name,\s*points,\s*created_at\s+FROM\s+students\s+WHERE\s+id\s*=\s*\?/i.test(sql)) {
       const [id] = p;
       const s = this._state.students.find((x) => x.id === id);
@@ -216,6 +243,9 @@ class PreparedStatement {
     }
 
     // ---- SELECT all students ----
+    if (/SELECT\s+id,\s*name,\s*total_points\s+AS\s+points/i.test(sql)) {
+      return [...this._state.students].sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? '')).map((s) => ({ ...s, points: s.total_points }));
+    }
     if (/SELECT\s+id,\s*name,\s*points,\s*created_at\s+FROM\s+students/i.test(sql)) {
       const list = [...this._state.students].sort((a, b) =>
         (a.created_at ?? '').localeCompare(b.created_at ?? '')

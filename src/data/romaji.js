@@ -2,7 +2,7 @@
 //
 // step: 出題ステップ分類。`'seion' | 'dakuon' | 'youon'`
 //   - seion: 清音（あ行〜わ行 + ん、計46文字）+ 互換のうぃ/うぇ
-//   - dakuon: 濁音・半濁音（ぢ・づ は除外、計23文字）
+//   - dakuon: 濁音・半濁音・小文字（計34文字）
 //   - youon: 拗音（ぢゃ系は除外、計33文字）
 // r: 主表記（訓令式優先 = タイピング効率を重視。SI/TI/TU/HU など）。
 //    内部 ID として使うため、ユニークかつ不変。比較・記録の主キー。
@@ -10,7 +10,7 @@
 //       set/delete 時は r に揃える。
 //
 // 出題時は [r, ...(alts ?? [])] からランダムに 1 つ表示する。
-export const romajiList = [
+const baseRomajiList = [
   // ----- 清音 (seion) -----
   { h: 'あ', r: 'a', row: 'あ', step: 'seion' }, { h: 'い', r: 'i', row: 'あ', step: 'seion' }, { h: 'う', r: 'u', row: 'あ', step: 'seion' }, { h: 'え', r: 'e', row: 'あ', step: 'seion' }, { h: 'お', r: 'o', row: 'あ', step: 'seion' },
   { h: 'か', r: 'ka', row: 'か', step: 'seion' }, { h: 'き', r: 'ki', row: 'か', step: 'seion' }, { h: 'く', r: 'ku', row: 'か', step: 'seion' }, { h: 'け', r: 'ke', row: 'か', step: 'seion' }, { h: 'こ', r: 'ko', row: 'か', step: 'seion' },
@@ -28,12 +28,16 @@ export const romajiList = [
   { h: 'が', r: 'ga', row: 'が', step: 'dakuon' }, { h: 'ぎ', r: 'gi', row: 'が', step: 'dakuon' }, { h: 'ぐ', r: 'gu', row: 'が', step: 'dakuon' }, { h: 'げ', r: 'ge', row: 'が', step: 'dakuon' }, { h: 'ご', r: 'go', row: 'が', step: 'dakuon' },
   // ざ行
   { h: 'ざ', r: 'za', row: 'ざ', step: 'dakuon' }, { h: 'じ', r: 'zi', alts: ['ji'], row: 'ざ', step: 'dakuon' }, { h: 'ず', r: 'zu', row: 'ざ', step: 'dakuon' }, { h: 'ぜ', r: 'ze', row: 'ざ', step: 'dakuon' }, { h: 'ぞ', r: 'zo', row: 'ざ', step: 'dakuon' },
-  // だ行 (ぢ・づ 除外)
-  { h: 'だ', r: 'da', row: 'だ', step: 'dakuon' }, { h: 'で', r: 'de', row: 'だ', step: 'dakuon' }, { h: 'ど', r: 'do', row: 'だ', step: 'dakuon' },
+  // だ行
+  { h: 'だ', r: 'da', row: 'だ', step: 'dakuon' }, { h: 'ぢ', r: 'di', row: 'だ', step: 'dakuon' }, { h: 'づ', r: 'du', row: 'だ', step: 'dakuon' }, { h: 'で', r: 'de', row: 'だ', step: 'dakuon' }, { h: 'ど', r: 'do', row: 'だ', step: 'dakuon' },
   // ば行
   { h: 'ば', r: 'ba', row: 'ば', step: 'dakuon' }, { h: 'び', r: 'bi', row: 'ば', step: 'dakuon' }, { h: 'ぶ', r: 'bu', row: 'ば', step: 'dakuon' }, { h: 'べ', r: 'be', row: 'ば', step: 'dakuon' }, { h: 'ぼ', r: 'bo', row: 'ば', step: 'dakuon' },
   // ぱ行 (半濁音)
   { h: 'ぱ', r: 'pa', row: 'ぱ', step: 'dakuon' }, { h: 'ぴ', r: 'pi', row: 'ぱ', step: 'dakuon' }, { h: 'ぷ', r: 'pu', row: 'ぱ', step: 'dakuon' }, { h: 'ぺ', r: 'pe', row: 'ぱ', step: 'dakuon' }, { h: 'ぽ', r: 'po', row: 'ぱ', step: 'dakuon' },
+  // 小文字（練習単位は3つ）
+  { h: 'ぁ', r: 'xa', row: '小さいあ', step: 'dakuon' }, { h: 'ぃ', r: 'xi', row: '小さいあ', step: 'dakuon' }, { h: 'ぅ', r: 'xu', row: '小さいあ', step: 'dakuon' }, { h: 'ぇ', r: 'xe', row: '小さいあ', step: 'dakuon' }, { h: 'ぉ', r: 'xo', row: '小さいあ', step: 'dakuon' },
+  { h: 'ゃ', r: 'xya', row: '小さいや', step: 'dakuon' }, { h: 'ゅ', r: 'xyu', row: '小さいや', step: 'dakuon' }, { h: 'ょ', r: 'xyo', row: '小さいや', step: 'dakuon' },
+  { h: 'っ', r: 'xtu', alts: ['ltsu'], row: '小さいつ', step: 'dakuon' },
 
   // ----- 拗音 (youon) -----  ぢゃ系は除外
   // きゃ行
@@ -60,6 +64,11 @@ export const romajiList = [
   { h: 'ぴゃ', r: 'pya', row: 'ぴゃ', step: 'youon' }, { h: 'ぴゅ', r: 'pyu', row: 'ぴゃ', step: 'youon' }, { h: 'ぴょ', r: 'pyo', row: 'ぴゃ', step: 'youon' },
 ];
 
+// `r` は既存の誤答記録との互換性を保つ安定character ID。
+export const romajiList = Object.freeze(baseRomajiList.map((item) => Object.freeze(item)));
+export const characterId = (item) => item.r;
+export const unitId = (item) => `${item.step}:${item.row}`;
+
 // 出題ステップの識別子
 export const STEPS = Object.freeze({
   seion: 'seion',
@@ -74,6 +83,7 @@ export const rows = [
   'あ', 'か', 'さ', 'た', 'な', 'は', 'ま', 'や', 'ら', 'わ',
   // 濁音・半濁音
   'が', 'ざ', 'だ', 'ば', 'ぱ',
+  '小さいあ', '小さいや', '小さいつ',
   // 拗音
   'きゃ', 'しゃ', 'ちゃ', 'にゃ', 'ひゃ', 'みゃ', 'りゃ', 'ぎゃ', 'じゃ', 'びゃ', 'ぴゃ',
 ];

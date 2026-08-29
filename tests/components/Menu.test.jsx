@@ -3,11 +3,13 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Menu from '../../src/components/Menu.jsx';
 import { rows } from '../../src/data/romaji.js';
+const openProgress = { access: rows.map((row) => ({ unitId: `${row === 'あ' || ['か','さ','た','な','は','ま','や','ら','わ'].includes(row) ? 'seion' : ['が','ざ','だ','ば','ぱ','小さいあ','小さいや','小さいつ'].includes(row) ? 'dakuon' : 'youon'}:${row}`, access: 'available' })) };
 
 describe('<Menu />', () => {
   it('displays the points prop in the points badge', () => {
     render(<Menu points={42} onStart={() => {}} />);
-    expect(screen.getByText('42 ぽいんと')).toBeInTheDocument();
+    expect(screen.getByText('ごうけい 42')).toBeInTheDocument();
+    expect(screen.getByText('つかえる 42')).toBeInTheDocument();
   });
 
   it('renders one button for every row', () => {
@@ -20,7 +22,7 @@ describe('<Menu />', () => {
   it('calls onStart with "あ" when the あ ぎょう button is clicked', async () => {
     const onStart = vi.fn();
     const user = userEvent.setup();
-    render(<Menu points={0} onStart={onStart} />);
+    render(<Menu points={0} progress={openProgress} onStart={onStart} />);
 
     await user.click(screen.getByRole('button', { name: 'あ ぎょう' }));
     // 第2引数（mode）は MenuMode.test.jsx 側で検証する

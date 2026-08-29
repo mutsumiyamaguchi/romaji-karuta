@@ -5,10 +5,10 @@ import { romajiList, rows, STEPS } from '../../src/data/romaji.js';
 //   step 'seion': 48 (清音46 + 互換 うぃ/うぇ)
 //   step 'dakuon': 23 (が/ざ/だ/ば/ぱ 行、ぢ・づ 除外)
 //   step 'youon': 33 (拗音 11 行 × 3、ぢゃ系 除外)
-//   total: 104
-const EXPECTED_TOTAL = 104;
+//   total: 115
+const EXPECTED_TOTAL = 115;
 const EXPECTED_SEION = 48;
-const EXPECTED_DAKUON = 23;
+const EXPECTED_DAKUON = 34;
 const EXPECTED_YOUON = 33;
 
 describe('romajiList', () => {
@@ -98,19 +98,20 @@ describe('romajiList', () => {
   });
 
   // ---- dakuon 検証 ----
-  it('dakuon includes ga/za/ba/pa rows with 5 entries each and da row with 3 entries', () => {
+  it('dakuon includes all five da-row characters and the small kana units', () => {
     const rowCount = (label) =>
       romajiList.filter((it) => it.step === 'dakuon' && it.row === label).length;
     expect(rowCount('が')).toBe(5);
     expect(rowCount('ざ')).toBe(5);
-    expect(rowCount('だ')).toBe(3);
+    expect(rowCount('だ')).toBe(5);
     expect(rowCount('ば')).toBe(5);
     expect(rowCount('ぱ')).toBe(5);
   });
 
-  it('dakuon excludes ぢ and づ (owner decision)', () => {
-    expect(romajiList.find((it) => it.h === 'ぢ')).toBeUndefined();
-    expect(romajiList.find((it) => it.h === 'づ')).toBeUndefined();
+  it('dakuon includes stable di/du mappings', () => {
+    expect(romajiList.find((it) => it.h === 'ぢ')?.r).toBe('di');
+    expect(romajiList.find((it) => it.h === 'づ')?.r).toBe('du');
+    expect(romajiList.filter((it) => ['小さいあ', '小さいや', '小さいつ'].includes(it.row))).toHaveLength(9);
   });
 
   it('じ has zi as r and ji as alt', () => {

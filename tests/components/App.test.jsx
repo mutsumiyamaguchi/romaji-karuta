@@ -14,9 +14,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 const { mocks } = vi.hoisted(() => ({
   mocks: {
     getStatus: vi.fn(),
+    initPin: vi.fn(),
     listStudents: vi.fn(),
+    createStudent: vi.fn(),
     getPoints: vi.fn(),
     addPoints: vi.fn(),
+    getProgress: vi.fn(),
     getWeakCharacters: vi.fn(),
     listMistakes: vi.fn(),
     recordMistake: vi.fn(),
@@ -25,14 +28,14 @@ const { mocks } = vi.hoisted(() => ({
 
 vi.mock('../../src/lib/api/mentor.js', () => ({
   getStatus: mocks.getStatus,
-  initPin: vi.fn(),
+  initPin: mocks.initPin,
   login: vi.fn(),
   changePin: vi.fn(),
 }));
 
 vi.mock('../../src/lib/api/students.js', () => ({
   listStudents: mocks.listStudents,
-  createStudent: vi.fn(),
+  createStudent: mocks.createStudent,
   deleteStudent: vi.fn(),
 }));
 
@@ -45,6 +48,13 @@ vi.mock('../../src/lib/api/mistakes.js', () => ({
   listMistakes: mocks.listMistakes,
   recordMistake: mocks.recordMistake,
   getWeakCharacters: mocks.getWeakCharacters,
+}));
+vi.mock('../../src/lib/api/progress.js', () => ({
+  getProgress: mocks.getProgress,
+  completePractice: vi.fn(),
+  unlockAssessment: vi.fn(),
+  startAssessment: vi.fn(),
+  answerAssessment: vi.fn(),
 }));
 
 // モック宣言後に import（hoist された vi.mock が先に効くため動的 import は不要だが、
@@ -59,6 +69,9 @@ describe('<App /> async boot', () => {
     mocks.addPoints.mockResolvedValue({ id: 's1', points: 0 });
     mocks.getWeakCharacters.mockResolvedValue([]);
     mocks.listMistakes.mockResolvedValue([]);
+    mocks.initPin.mockResolvedValue({});
+    mocks.createStudent.mockResolvedValue({});
+    mocks.getProgress.mockResolvedValue({ totalPoints: 0, availablePoints: 0, passedSteps: [], access: [], assessments: [] });
   });
 
   it('shows the loading screen first, then SetupScreen when mentor is not initialized', async () => {
@@ -93,6 +106,24 @@ describe('<App /> async boot', () => {
     expect(mocks.getPoints).not.toHaveBeenCalled();
   });
 
+  it('loads progress before leaving setup completion', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    mocks.getStatus.mockResolvedValue(false);
+    mocks.listStudents.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 'new', name: 'たろう', points: 0 }]);
+    mocks.getProgress.mockResolvedValue({ totalPoints: 0, availablePoints: 0, passedSteps: [], access: [{ unitId: 'seion:あ', access: 'available' }], assessments: [] });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('はじめてのセットアップ');
+    await user.type(screen.getByPlaceholderText('PIN (4けた)'), '1234');
+    await user.type(screen.getByPlaceholderText('もういちど'), '1234');
+    await user.click(screen.getByText('つぎへ'));
+    await user.type(await screen.findByPlaceholderText('例: たろう'), 'たろう');
+    await user.click(screen.getByText('はじめる'));
+    await screen.findByText('ローマじ かるた');
+    expect(mocks.getProgress).toHaveBeenCalledWith('new');
+    expect(screen.getByRole('button', { name: /^あ ぎょう/ })).toBeEnabled();
+  });
+
   it('shows Menu with the current student when setup is complete and students exist', async () => {
     mocks.getStatus.mockResolvedValue(true);
     mocks.listStudents.mockResolvedValue([
@@ -100,6 +131,7 @@ describe('<App /> async boot', () => {
       { id: 's2', name: 'はなこ', points: 50 },
     ]);
     mocks.getPoints.mockResolvedValue(120);
+    mocks.getProgress.mockResolvedValue({ totalPoints: 120, availablePoints: 80, passedSteps: [], access: [], assessments: [] });
 
     render(<App />);
 
@@ -114,7 +146,7 @@ describe('<App /> async boot', () => {
     // 現在の生徒名（バッジ）
     expect(screen.getByText('たろう')).toBeInTheDocument();
     // ポイントが反映されている（getPoints の戻り値）
-    expect(screen.getByText('120 ぽいんと')).toBeInTheDocument();
+    expect(screen.getByText('ごうけい 120')).toBeInTheDocument();
     // 最初の生徒 ID が currentStudent に固定される（localStorage 経由）
     expect(localStorage.getItem('romajiCurrentStudentId')).toBe('s1');
     // 1人目の生徒を引数に getPoints が呼ばれている
@@ -129,13 +161,14 @@ describe('<App /> async boot', () => {
       { id: 's2', name: 'はなこ', points: 50 },
     ]);
     mocks.getPoints.mockResolvedValue(50);
+    mocks.getProgress.mockResolvedValue({ totalPoints: 50, availablePoints: 50, passedSteps: [], access: [], assessments: [] });
 
     render(<App />);
 
     await waitFor(() => {
       expect(screen.getByText('はなこ')).toBeInTheDocument();
     });
-    expect(screen.getByText('50 ぽいんと')).toBeInTheDocument();
+    expect(screen.getByText('ごうけい 50')).toBeInTheDocument();
     expect(mocks.getPoints).toHaveBeenCalledWith('s2');
   });
 
@@ -154,6 +187,31 @@ describe('<App /> async boot', () => {
     expect(
       screen.getByRole('button', { name: 'もういちど' })
     ).toBeInTheDocument();
+  });
+
+  it('fails closed when progress cannot be loaded', async () => {
+    mocks.getStatus.mockResolvedValue(true);
+    mocks.listStudents.mockResolvedValue([{ id: 's1', name: 'たろう', points: 0 }]);
+    mocks.getPoints.mockResolvedValue(0);
+    mocks.getProgress.mockRejectedValue(new Error('progress unavailable'));
+    render(<App />);
+    expect(await screen.findByText('つながらない みたい')).toBeInTheDocument();
+    expect(screen.queryByText('れんしゅうする ぎょうを えらんでね！')).not.toBeInTheDocument();
+  });
+
+  it('clears old progress while switching students and does not reuse it on failure', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    mocks.getStatus.mockResolvedValue(true);
+    mocks.listStudents.mockResolvedValue([{ id: 's1', name: 'たろう', points: 0 }, { id: 's2', name: 'はなこ', points: 0 }]);
+    mocks.getPoints.mockResolvedValue(0);
+    mocks.getProgress.mockResolvedValueOnce({ totalPoints: 0, availablePoints: 0, passedSteps: [], access: [{ unitId: 'seion:あ', access: 'available' }], assessments: [] }).mockRejectedValueOnce(new Error('offline'));
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ローマじ かるた');
+    await user.click(screen.getByRole('button', { name: /たろう/ }));
+    await user.click(screen.getByRole('button', { name: /はなこ/ }));
+    await waitFor(() => expect(screen.getByText('はなこ')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /^あ ぎょう/ })).toBeDisabled();
   });
 
   it('defaults letterCase to upper when localStorage has no saved value', async () => {

@@ -52,11 +52,14 @@ const LONG_PRESS_MS = 3000;
 //   onLetterCaseChange: (value) => void — letterCase 切替コールバック
 export default function Menu({
   points,
+  availablePoints = points,
+  progress,
   currentStudent,
   students = [],
   onSelectStudent,
   onStart,
   onMentorAccess,
+  onAssessment,
   letterCase = LETTER_CASES.upper,
   onLetterCaseChange,
 }) {
@@ -176,7 +179,8 @@ export default function Menu({
       {/* 右上: ポイント表示 */}
       <div className="absolute top-4 right-4 bg-white px-4 py-2 rounded-full shadow-md flex items-center gap-2 border-2 border-yellow-400">
         <Star className="text-yellow-400 fill-yellow-400 w-6 h-6" />
-        <span className="text-xl font-bold text-yellow-600">{points} ぽいんと</span>
+        <span className="text-sm font-bold text-yellow-700">ごうけい {points}</span>
+        <span className="text-sm font-bold text-orange-700">つかえる {availablePoints}</span>
       </div>
 
       {/* モードタブ */}
@@ -244,15 +248,21 @@ export default function Menu({
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 w-full max-w-3xl mb-6">
-        {rows.map((row) => (
+        {rows.map((row) => {
+          const item = romajiList.find((entry) => entry.row === row);
+          const access = progress === undefined ? 'available' : progress?.access?.find((entry) => entry.unitId === `${item?.step}:${row}`)?.access ?? 'locked';
+          return (
           <button
             key={row}
-            onClick={() => handleStart(row)}
-            className="bg-white border-4 border-orange-400 rounded-2xl py-4 shadow-[0_6px_0_#f6ad55] active:shadow-[0_0px_0_#f6ad55] active:translate-y-2 transition-all flex items-center justify-center text-3xl font-bold text-orange-600 hover:bg-orange-50"
+            disabled={access === 'locked'}
+            onClick={() => access !== 'locked' && handleStart(row)}
+            className="bg-white border-4 border-orange-400 rounded-2xl py-4 shadow-[0_6px_0_#f6ad55] active:shadow-[0_0px_0_#f6ad55] active:translate-y-2 transition-all flex flex-col items-center justify-center text-3xl font-bold text-orange-600 hover:bg-orange-50 disabled:opacity-40"
           >
             {row} ぎょう
+            {access === 'legacy-preview' && <span className="text-xs">さきどりれんしゅう</span>}
+            {access === 'locked' && <span className="text-xs">ロック</span>}
           </button>
-        ))}
+        );})}
       </div>
 
       {/* ランダム 15問 ステップ別ボタン（清音 / 濁音半濁音 / 拗音） */}
@@ -290,6 +300,7 @@ export default function Menu({
           </span>
         </button>
       </div>
+      <button onClick={onAssessment} className="mt-4 w-full max-w-2xl rounded-3xl border-4 border-blue-600 bg-blue-400 py-5 text-2xl font-black text-white shadow-[0_8px_0_#2563eb]">うでだめし</button>
     </div>
   );
 }

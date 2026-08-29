@@ -22,6 +22,7 @@ const readLetterCase = () => {
 };
 import * as studentsApi from './lib/api/students.js';
 import * as pointsApi from './lib/api/points.js';
+import * as progressApi from './lib/api/progress.js';
 import * as mistakesApi from './lib/api/mistakes.js';
 import * as mentorApi from './lib/api/mentor.js';
 import Menu from './components/Menu.jsx';
@@ -32,6 +33,8 @@ import MentorMenu from './components/MentorMenu.jsx';
 import LoadingScreen from './components/LoadingScreen.jsx';
 import ErrorScreen from './components/ErrorScreen.jsx';
 import SetupScreen from './components/SetupScreen.jsx';
+import AssessmentMenu from './components/AssessmentMenu.jsx';
+import AssessmentRun from './components/AssessmentRun.jsx';
 
 export default function App() {
   // ロード状態
@@ -46,6 +49,7 @@ export default function App() {
 
   // セッション
   const [points, setPoints] = useState(0);
+  const [progress, setProgress] = useState(null);
 
   // 画面モード
   const [mode, setMode] = useState('menu'); // menu | playing | result | mentor
@@ -56,6 +60,8 @@ export default function App() {
   const [questions, setQuestions] = useState([]);
   const [score, setScore] = useState(0);
   const [earnedPoints, setEarnedPoints] = useState(0);
+  const [practiceUnitId, setPracticeUnitId] = useState(null);
+  const [assessmentRun, setAssessmentRun] = useState(null);
   const [lastMistakes, setLastMistakes] = useState([]);
   const [isRetry, setIsRetry] = useState(false);
 
@@ -93,8 +99,10 @@ export default function App() {
         }
         setCurrentSid(sid);
         const p = await pointsApi.getPoints(sid);
+        const nextProgress = await progressApi.getProgress(sid);
         if (!alive) return;
         setPoints(p);
+        setProgress(nextProgress);
         setLoading(false);
       } catch (err) {
         if (!alive) return;
@@ -113,6 +121,8 @@ export default function App() {
     selectedMode = MODES.h2r,
     selectedLetterCase = LETTER_CASES.upper
   ) => {
+    if (!progress) return;
+    const allowedUnits = new Set((progress?.access ?? []).filter((item) => item.access !== 'locked').map((item) => item.unitId));
     let qs;
     // ステップ別ランダム 15 問: 各 step から 15 問抽出
     const stepForTarget =
@@ -142,6 +152,9 @@ export default function App() {
     } else {
       qs = romajiList.filter((it) => it.row === targetRow);
     }
+    // row/random/weakの全入口を同じaccess policyへ通す。
+    if (progress) qs = qs.filter((item) => allowedUnits.has(`${item.step}:${item.row}`));
+    if (qs.length === 0) return;
     setPlayMode(selectedMode);
     setGameLetterCase(selectedLetterCase);
     setQuestions(qs);
@@ -149,6 +162,7 @@ export default function App() {
     setEarnedPoints(0);
     setLastMistakes([]);
     setIsRetry(false);
+    setPracticeUnitId(qs.length > 0 && qs.every((q) => q.row === targetRow) ? qs[0].unitId ?? `${qs[0].step}:${qs[0].row}` : null);
     setMode('playing');
   };
 
@@ -163,15 +177,9 @@ export default function App() {
     setMode('playing');
   };
 
-  // 正解時 (delta=10)。サーバ加算は楽観 UI で待たない。
-  // PlayContainer 側で isRetry 時はそもそも呼ばれない。
-  const handlePointsChange = (delta) => {
+  // 通常練習中は正解数だけを数える。報酬は全問終了時にサーバーが検証する。
+  const handlePointsChange = () => {
     setScore((s) => s + 1);
-    setEarnedPoints((p) => p + delta);
-    setPoints((p) => p + delta);
-    if (currentSid) {
-      pointsApi.addPoints(currentSid, delta).catch(() => {});
-    }
   };
 
   // 再挑戦モードの正解カウント。ポイントは増やさない。
@@ -180,8 +188,22 @@ export default function App() {
   };
 
   // PlayContainer から終了通知（mistakes を受け取る）
-  const handleFinished = (mistakes) => {
+  const handleFinished = async (mistakes) => {
     setLastMistakes(mistakes ?? []);
+    if (!isRetry && currentSid && practiceUnitId && (mistakes ?? []).length === 0) {
+      try {
+        const result = await progressApi.completePractice(currentSid, {
+          unitId: practiceUnitId,
+          answers: questions.map((question) => ({ promptCharacterId: question.r, selectedChoiceId: question.r })),
+          retry: false,
+          mode: playMode,
+        });
+        setEarnedPoints(result.awarded);
+        setPoints(result.totalPoints);
+      } catch {
+        setEarnedPoints(0);
+      }
+    }
     setMode('result');
   };
 
@@ -191,8 +213,9 @@ export default function App() {
     setMode('menu');
     if (currentSid) {
       try {
-        const p = await pointsApi.getPoints(currentSid);
-        setPoints(p);
+        const nextProgress = await progressApi.getProgress(currentSid);
+        setPoints(nextProgress.totalPoints);
+        setProgress(nextProgress);
       } catch {
         // ignore
       }
@@ -230,11 +253,14 @@ export default function App() {
     if (id === currentSid) return;
     setCurrentStudentId(id);
     setCurrentSid(id);
+    setProgress(null);
     try {
-      const p = await pointsApi.getPoints(id);
-      setPoints(p);
+      const nextProgress = await progressApi.getProgress(id);
+      setPoints(nextProgress.totalPoints);
+      setProgress(nextProgress);
     } catch {
       setPoints(0);
+      setProgress(null);
     }
   };
 
@@ -246,8 +272,9 @@ export default function App() {
         const sid = list[0].id;
         setCurrentStudentId(sid);
         setCurrentSid(sid);
-        const p = await pointsApi.getPoints(sid);
-        setPoints(p);
+        const nextProgress = await progressApi.getProgress(sid);
+        setPoints(nextProgress.totalPoints);
+        setProgress(nextProgress);
       }
       setNeedsSetup(false);
     } catch (err) {
@@ -275,16 +302,45 @@ export default function App() {
     );
   }
 
+  if (mode === 'assessment') {
+    return <AssessmentMenu progress={progress} onBack={() => setMode('menu')} onOpen={async (step, unlocked) => {
+      try {
+        if (!unlocked) await progressApi.unlockAssessment(currentSid, step);
+        const attempt = await progressApi.startAssessment(currentSid, step);
+        const nextProgress = await progressApi.getProgress(currentSid);
+        setProgress(nextProgress);
+        setPoints(nextProgress.totalPoints);
+        setAssessmentRun({ step, state: attempt });
+        setMode('assessment-run');
+      } catch { /* 状態は再取得時に復帰できる */ }
+    }} />;
+  }
+
+  if (mode === 'assessment-run' && assessmentRun) {
+    return <AssessmentRun studentId={currentSid} step={assessmentRun.step} initialState={assessmentRun.state} letterCase={letterCase} points={points} onBack={async () => {
+      const nextProgress = await progressApi.getProgress(currentSid).catch(() => progress);
+      setProgress(nextProgress);
+      setAssessmentRun(null);
+      setMode('assessment');
+    }} onPassed={async () => {
+      const nextProgress = await progressApi.getProgress(currentSid);
+      setProgress(nextProgress);
+    }} />;
+  }
+
   return (
     <>
       {mode === 'menu' && (
         <Menu
           points={points}
+          availablePoints={progress?.availablePoints ?? points}
+          progress={progress}
           currentStudent={currentStudent}
           students={students}
           onSelectStudent={handleSelectStudent}
           onStart={startGame}
           onMentorAccess={handleMentorAccess}
+          onAssessment={() => setMode('assessment')}
           letterCase={letterCase}
           onLetterCaseChange={handleLetterCaseChange}
         />

@@ -13,7 +13,7 @@ import { requireMentor } from '../auth.js';
 export async function listStudents({ env }) {
   if (!env?.DB) return errorJson('DB binding is missing', 500);
   const result = await env.DB
-    .prepare('SELECT id, name, points, created_at FROM students ORDER BY created_at ASC')
+    .prepare('SELECT id, name, total_points AS points, total_points, available_points, legacy_full_access, created_at FROM students ORDER BY created_at ASC')
     .all();
   return json({ students: result?.results ?? [] });
 }
@@ -35,11 +35,11 @@ export async function createStudent({ request, env }) {
   const id = generateId();
   const name = body.name.trim();
   await env.DB
-    .prepare('INSERT INTO students (id, name, points) VALUES (?, ?, 0)')
+    .prepare('INSERT INTO students (id, name, points, total_points, available_points, legacy_full_access) VALUES (?, ?, 0, 0, 0, 0)')
     .bind(id, name)
     .run();
   const student = await env.DB
-    .prepare('SELECT id, name, points, created_at FROM students WHERE id = ?')
+    .prepare('SELECT id, name, total_points AS points, total_points, available_points, legacy_full_access, created_at FROM students WHERE id = ?')
     .bind(id)
     .first();
   return json({ student }, 201);
@@ -57,7 +57,10 @@ export async function deleteStudent({ request, env, params }) {
   if (!(await requireMentor(request, env, body))) {
     return errorJson('mentor authentication required', 401);
   }
-  // CASCADE が効かないケースに備えて mistakes を先に削除
+  // D1でforeign_keysが無効な接続にも対応し、子データを明示削除する。
+  await env.DB.prepare('DELETE FROM assessment_answers WHERE student_id = ?').bind(id).run();
+  await env.DB.prepare('DELETE FROM assessment_progress WHERE student_id = ?').bind(id).run();
+  await env.DB.prepare('DELETE FROM practice_completions WHERE student_id = ?').bind(id).run();
   await env.DB.prepare('DELETE FROM mistakes WHERE student_id = ?').bind(id).run();
   const result = await env.DB
     .prepare('DELETE FROM students WHERE id = ?')
