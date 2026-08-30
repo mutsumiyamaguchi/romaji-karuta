@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { romajiList, STEPS } from './data/romaji.js';
 import { shuffle } from './lib/shuffle.js';
+import { orderRetryQuestions, orderRowQuestions } from './lib/questionOrder.js';
 import { MODES, LETTER_CASES } from './lib/mode.js';
 import {
   getCurrentStudentId,
@@ -150,7 +151,7 @@ export default function App() {
       }
       if (qs.length === 0) qs = shuffle([...romajiList]).slice(0, 15);
     } else {
-      qs = romajiList.filter((it) => it.row === targetRow);
+      qs = orderRowQuestions(romajiList, targetRow);
     }
     // row/random/weakの全入口を同じaccess policyへ通す。
     if (progress) qs = qs.filter((item) => allowedUnits.has(`${item.step}:${item.row}`));
@@ -169,7 +170,7 @@ export default function App() {
   // 間違えた問題だけで再プレイ（ノーポイント）
   const handleRetryWrongOnly = () => {
     if (lastMistakes.length === 0) return;
-    setQuestions(lastMistakes);
+    setQuestions(orderRetryQuestions(lastMistakes));
     setScore(0);
     setEarnedPoints(0);
     setLastMistakes([]);
