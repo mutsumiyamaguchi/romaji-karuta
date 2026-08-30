@@ -7,10 +7,12 @@ const VOWEL_PATTERN = /[aiueo]$/;
 
 export const getFinalVowel = (item) => item?.r?.match(VOWEL_PATTERN)?.[0] ?? null;
 
-// 正解と同じ母音の札を優先して4択を作る。
-// 「ん」のように母音がない場合と、同母音候補が不足する場合は全体から補う。
+// 正解と同じstep・母音の札を優先して4択を作る。
+// 「ん」のように母音がない場合と、同母音候補が不足する場合も同じstep内だけで補う。
 export const generateChoices = (correctItem, items = romajiList) => {
-  const otherItems = items.filter((item) => item.r !== correctItem.r);
+  const otherItems = items.filter(
+    (item) => item.r !== correctItem.r && item.step === correctItem.step
+  );
   const vowel = getFinalVowel(correctItem);
   const sameVowelItems = vowel
     ? otherItems.filter((item) => getFinalVowel(item) === vowel)
@@ -24,6 +26,9 @@ export const generateChoices = (correctItem, items = romajiList) => {
     ...selected,
     ...shuffle(fallbackItems).slice(0, remainingCount),
   ];
+  if (wrongChoices.length !== CHOICE_COUNT - 1) {
+    throw new Error(`not enough choices in step: ${correctItem.step ?? 'unknown'}`);
+  }
 
   return shuffle([correctItem, ...wrongChoices]).map((item) => ({
     ...item,
