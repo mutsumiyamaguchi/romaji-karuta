@@ -50,13 +50,13 @@ describe('<Menu /> mode selector', () => {
     expect(onStart).toHaveBeenLastCalledWith('あ', 'r2h', 'upper');
   });
 
-  it('passes the selected mode for the ステップ1 button as well', async () => {
+  it('passes the selected mode for the random practice button as well', async () => {
     const onStart = vi.fn();
     const user = userEvent.setup();
     render(<Menu points={0} onStart={onStart} />);
 
     await user.click(getModeTab('r2h'));
-    await user.click(screen.getByText('せいおん').closest('button'));
+    await user.click(screen.getByRole('button', { name: /せいおん から ランダム15もん/ }));
     expect(onStart).toHaveBeenLastCalledWith('random-seion', 'r2h', 'upper');
   });
 });

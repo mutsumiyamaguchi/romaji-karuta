@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Star, Flame, ChevronDown, User } from 'lucide-react';
+import { Star, Flame, ChevronDown, Lock, User } from 'lucide-react';
 import { rows, romajiList, STEPS } from '../data/romaji.js';
 
 // ステップ別ボタンの表示メタ。
@@ -15,7 +15,7 @@ const STEP_BUTTONS = [
     step: STEPS.dakuon,
     target: 'random-dakuon',
     title: 'ステップ2',
-    subtitle: 'だくおん・はんだくおん',
+    subtitle: 'だくおん・はんだくおん・小文字',
   },
   {
     step: STEPS.youon,
@@ -64,6 +64,7 @@ export default function Menu({
   onLetterCaseChange,
 }) {
   const [mode, setMode] = useState(MODES.h2r);
+  const [selectedStep, setSelectedStep] = useState(STEPS.seion);
   const [weakAvailable, setWeakAvailable] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const longPressTimerRef = useRef(null);
@@ -128,6 +129,19 @@ export default function Menu({
         ? 'bg-orange-500 text-white shadow-[0_3px_0_#c2410c]'
         : 'bg-transparent text-orange-700',
     ].join(' ');
+
+  const selectedStepButton = STEP_BUTTONS.find((item) => item.step === selectedStep);
+  const visibleRows = rows.filter((row) =>
+    romajiList.some((item) => item.row === row && item.step === selectedStep)
+  );
+  const accessForRow = (row) => {
+    const item = romajiList.find((entry) => entry.row === row && entry.step === selectedStep);
+    return progress === undefined
+      ? 'available'
+      : progress?.access?.find((entry) => entry.unitId === `${item?.step}:${row}`)?.access ?? 'locked';
+  };
+  const selectedStepLocked = visibleRows.every((row) => accessForRow(row) === 'locked');
+  const selectedStepPreview = visibleRows.some((row) => accessForRow(row) === 'legacy-preview');
 
   return (
     <div className="min-h-screen bg-yellow-50 text-gray-800 font-sans p-4 flex flex-col items-center justify-center">
@@ -247,10 +261,50 @@ export default function Menu({
         </p>
       </div>
 
+      {/* 学習ステップ切替。未解放タブも選べるが、行はロック表示する。 */}
+      <div
+        className="mb-5 flex w-full max-w-3xl gap-2 rounded-3xl border-2 border-orange-200 bg-white p-2"
+        role="tablist"
+        aria-label="学習ステップ"
+      >
+        {STEP_BUTTONS.map((item) => {
+          const active = selectedStep === item.step;
+          return (
+            <button
+              key={item.step}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setSelectedStep(item.step)}
+              className={[
+                'flex-1 rounded-2xl px-2 py-3 text-sm font-black transition-all sm:text-base',
+                active
+                  ? 'bg-orange-500 text-white shadow-[0_4px_0_#c2410c]'
+                  : 'bg-orange-50 text-orange-700',
+              ].join(' ')}
+            >
+              <span className="block">{item.title}</span>
+              <span className="mt-1 block text-xs sm:text-sm">{item.subtitle}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {selectedStepLocked && (
+        <div className="mb-5 flex w-full max-w-3xl items-center justify-center gap-2 rounded-2xl border-2 border-slate-300 bg-white px-4 py-3 text-center font-bold text-slate-600">
+          <Lock className="h-5 w-5" />
+          前のステップの うでだめしに ごうかくすると かいほう！
+        </div>
+      )}
+      {selectedStepPreview && (
+        <div className="mb-5 w-full max-w-3xl rounded-2xl border-2 border-blue-200 bg-blue-50 px-4 py-3 text-center text-sm font-bold text-blue-700">
+          さきどりれんしゅう中は ポイントは つかないよ
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 w-full max-w-3xl mb-6">
-        {rows.map((row) => {
-          const item = romajiList.find((entry) => entry.row === row);
-          const access = progress === undefined ? 'available' : progress?.access?.find((entry) => entry.unitId === `${item?.step}:${row}`)?.access ?? 'locked';
+        {visibleRows.map((row) => {
+          const access = accessForRow(row);
           return (
           <button
             key={row}
@@ -265,24 +319,19 @@ export default function Menu({
         );})}
       </div>
 
-      {/* ランダム 15問 ステップ別ボタン（清音 / 濁音半濁音 / 拗音） */}
-      <div className="w-full max-w-3xl grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4">
-        {STEP_BUTTONS.map((b) => (
-          <button
-            key={b.step}
-            onClick={() => handleStart(b.target)}
-            className="bg-gradient-to-r from-red-400 to-pink-500 border-4 border-pink-600 rounded-3xl py-5 shadow-[0_8px_0_#be185d] active:shadow-[0_0px_0_#be185d] active:translate-y-2 transition-all flex flex-col items-center justify-center text-white"
-          >
-            <span className="text-base sm:text-lg font-bold bg-white/25 px-3 py-0.5 rounded-full mb-1">
-              {b.title}
-            </span>
-            <span className="text-xl sm:text-2xl font-black mb-1">{b.subtitle}</span>
-            <span className="text-xs sm:text-sm font-bold bg-white/30 px-3 py-1 rounded-full">
-              {STEP_COUNTS[b.step]}もん から 15もん
-            </span>
-          </button>
-        ))}
-      </div>
+      {/* 選択中ステップからランダム15問 */}
+      <button
+        disabled={selectedStepLocked}
+        onClick={() => !selectedStepLocked && handleStart(selectedStepButton.target)}
+        className="mb-4 flex w-full max-w-3xl flex-col items-center justify-center rounded-3xl border-4 border-pink-600 bg-gradient-to-r from-red-400 to-pink-500 py-5 text-white shadow-[0_8px_0_#be185d] transition-all active:translate-y-2 active:shadow-[0_0px_0_#be185d] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0 disabled:active:shadow-[0_8px_0_#be185d]"
+      >
+        <span className="text-xl font-black sm:text-2xl">
+          {selectedStepButton.subtitle} から ランダム15もん
+        </span>
+        <span className="mt-1 rounded-full bg-white/30 px-3 py-1 text-xs font-bold sm:text-sm">
+          {STEP_COUNTS[selectedStep]}もん から 15もん
+        </span>
+      </button>
 
       <div className="w-full max-w-2xl flex justify-center">
         <button

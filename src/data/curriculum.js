@@ -42,3 +42,8 @@ export function splitAssessment(step) {
 export function canAccessStep(progress, stepNumber) {
   return Boolean(progress.legacy_full_access) || stepNumber === 1 || progress.passedSteps.includes(stepNumber - 1);
 }
+
+// 正式な学習進捗。legacyの先取りアクセスは含めない。
+export function hasReachedStep(progress, stepNumber) {
+  return stepNumber === 1 || progress.passedSteps.includes(stepNumber - 1);
+}

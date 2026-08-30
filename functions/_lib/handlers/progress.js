@@ -4,6 +4,7 @@ import {
   CURRICULUM,
   CURRICULUM_VERSION,
   canAccessStep,
+  hasReachedStep,
   getStep,
   getUnit,
   splitAssessment,
@@ -66,6 +67,9 @@ export async function completePractice({ request, env, params }) {
   if (!canAccessStep({ legacy_full_access: student.legacy_full_access, passedSteps: passed }, unit.step.number)) {
     return errorJson('unit is locked', 403);
   }
+  if (!hasReachedStep({ passedSteps: passed }, unit.step.number)) {
+    return errorJson('preview practice does not earn progress', 403);
+  }
   const expected = unit.characters.map(characterId).sort();
   const transcript = Array.isArray(body?.answers) ? body.answers : [];
   const submitted = transcript.map((answer) => answer?.promptCharacterId).sort();
@@ -100,6 +104,13 @@ export async function unlockAssessment({ env, params }) {
   if (step.number > 1 && !passed.includes(step.number - 1)) return errorJson('previous assessment must be passed', 409);
   const existing = await env.DB.prepare('SELECT status FROM assessment_progress WHERE student_id = ? AND step = ?').bind(student.id, step.number).first();
   if (existing) return json({ status: existing.status, charged: false, totalPoints: student.total_points, availablePoints: student.available_points });
+  const completionResult = await env.DB.prepare(
+    'SELECT unit_id, reward FROM practice_completions WHERE student_id = ? AND curriculum_version = ? ORDER BY unit_id'
+  ).bind(student.id, CURRICULUM_VERSION).all();
+  const completedUnits = new Set((completionResult?.results ?? []).map((row) => row.unit_id));
+  if (!step.units.every((unitId) => completedUnits.has(unitId))) {
+    return errorJson('complete every practice unit before unlocking the assessment', 409);
+  }
   if (student.available_points < ASSESSMENT_COST) return errorJson('not enough available points', 409);
   const results = await env.DB.batch([
     env.DB.prepare(`INSERT OR IGNORE INTO assessment_progress (student_id, step, curriculum_version, status)
