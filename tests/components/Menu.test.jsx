@@ -26,6 +26,19 @@ describe('<Menu />', () => {
     expect(screen.getByText('つかえる 17')).toBeInTheDocument();
   });
 
+  it('places the student and points inside a normal-flow header before mode tabs', () => {
+    render(<Menu points={42} currentStudent={{ id: 's1', name: 'たろう' }} onStart={() => {}} />);
+    const header = screen.getByTestId('menu-header');
+    const student = screen.getByTestId('student-picker');
+    const points = screen.getByTestId('points-badge');
+    const modeTabs = screen.getByTestId('mode-tabs');
+
+    expect(header).toContainElement(student);
+    expect(header).toContainElement(points);
+    expect(header).not.toHaveClass('absolute');
+    expect(header.compareDocumentPosition(modeTabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('shows only step 1 rows initially', () => {
     render(<Menu points={0} progress={openProgress} onStart={() => {}} />);
     expect(screen.getByRole('button', { name: 'あ ぎょう' })).toBeInTheDocument();

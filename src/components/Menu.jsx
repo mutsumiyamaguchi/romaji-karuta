@@ -145,63 +145,73 @@ export default function Menu({
 
   return (
     <div className="min-h-screen bg-yellow-50 text-gray-800 font-sans p-4 flex flex-col items-center justify-center">
-      {/* 左上: 生徒名バッジ + ピッカー */}
-      <div className="absolute top-4 left-4 z-10">
-        <button
-          onClick={() => setPickerOpen((v) => !v)}
-          className="bg-white px-4 py-2 rounded-full shadow-md flex items-center gap-2 border-2 border-orange-300 active:translate-y-0.5 transition-all"
-        >
-          <User className="w-5 h-5 text-orange-500" />
-          <span className="text-base font-bold text-orange-700">
-            {currentStudent?.name ?? '生徒なし'}
-          </span>
-          <ChevronDown className="w-4 h-4 text-orange-400" />
-        </button>
-        {pickerOpen && (
-          <div className="absolute top-12 left-0 bg-white rounded-2xl shadow-xl border-2 border-orange-200 py-2 w-56 z-20">
-            {students.length === 0 ? (
-              <p className="px-4 py-2 text-sm text-slate-400">
-                生徒が ありません
-              </p>
-            ) : (
-              students.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => {
-                    onSelectStudent?.(s.id);
-                    setPickerOpen(false);
-                  }}
-                  className={[
-                    'w-full px-4 py-2 text-left flex items-center gap-2 transition-colors',
-                    s.id === currentStudent?.id
-                      ? 'bg-orange-50 text-orange-700 font-bold'
-                      : 'text-slate-700 hover:bg-orange-50',
-                  ].join(' ')}
-                >
-                  <User className="w-4 h-4" />
-                  <span className="flex-1">{s.name}</span>
-                  <span className="text-xs text-amber-600">
-                    {s.points} pt
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
-        )}
-      </div>
+      {/* 通常フローのヘッダー。狭幅では折り返し、下のモードタブを覆わない。 */}
+      <header
+        className="mb-3 flex w-full max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+        data-testid="menu-header"
+      >
+        {/* 生徒名バッジ + ピッカー */}
+        <div className="relative z-10 min-w-0 self-start" data-testid="student-picker">
+          <button
+            onClick={() => setPickerOpen((v) => !v)}
+            className="flex max-w-full items-center gap-2 rounded-full border-2 border-orange-300 bg-white px-4 py-2 shadow-md transition-all active:translate-y-0.5"
+          >
+            <User className="h-5 w-5 shrink-0 text-orange-500" />
+            <span className="max-w-[70vw] truncate text-base font-bold text-orange-700 sm:max-w-64">
+              {currentStudent?.name ?? '生徒なし'}
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-orange-400" />
+          </button>
+          {pickerOpen && (
+            <div className="absolute left-0 top-12 z-20 w-56 rounded-2xl border-2 border-orange-200 bg-white py-2 shadow-xl">
+              {students.length === 0 ? (
+                <p className="px-4 py-2 text-sm text-slate-400">
+                  生徒が ありません
+                </p>
+              ) : (
+                students.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      onSelectStudent?.(s.id);
+                      setPickerOpen(false);
+                    }}
+                    className={[
+                      'w-full px-4 py-2 text-left flex items-center gap-2 transition-colors',
+                      s.id === currentStudent?.id
+                        ? 'bg-orange-50 text-orange-700 font-bold'
+                        : 'text-slate-700 hover:bg-orange-50',
+                    ].join(' ')}
+                  >
+                    <User className="w-4 h-4" />
+                    <span className="flex-1">{s.name}</span>
+                    <span className="text-xs text-amber-600">
+                      {s.points} pt
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
 
-      {/* 右上: ポイント表示 */}
-      <div className="absolute top-4 right-4 bg-white px-4 py-2 rounded-full shadow-md flex items-center gap-2 border-2 border-yellow-400">
-        <Star className="text-yellow-400 fill-yellow-400 w-6 h-6" />
-        <span className="text-sm font-bold text-yellow-700">ごうけい {points}</span>
-        <span className="text-sm font-bold text-orange-700">つかえる {availablePoints}</span>
-      </div>
+        {/* ポイント表示 */}
+        <div
+          className="flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-2xl border-2 border-yellow-400 bg-white px-4 py-2 shadow-md sm:w-auto sm:rounded-full"
+          data-testid="points-badge"
+        >
+          <Star className="h-6 w-6 shrink-0 fill-yellow-400 text-yellow-400" />
+          <span className="text-sm font-bold text-yellow-700">ごうけい {points}</span>
+          <span className="text-sm font-bold text-orange-700">つかえる {availablePoints}</span>
+        </div>
+      </header>
 
       {/* モードタブ */}
       <div
         className="w-full max-w-2xl mb-3 p-1.5 bg-white rounded-full border-2 border-orange-200 flex gap-2"
         role="tablist"
         aria-label="出題モード"
+        data-testid="mode-tabs"
       >
         {Object.values(MODES).map((m) => (
           <button
