@@ -51,6 +51,7 @@ const LONG_PRESS_MS = 3000;
 //   onMentorAccess: () => void — ロゴ長押し検知時（PINダイアログを開く）
 //   letterCase: 'upper' | 'lower' — アルファベット大小（親 App から渡される）
 //   onLetterCaseChange: (value) => void — letterCase 切替コールバック
+//   selectedStep / onSelectedStepChange — 表示中の学習ステップ。親が持つと、練習から戻っても選択が保たれる。
 export default function Menu({
   points,
   availablePoints = points,
@@ -63,9 +64,17 @@ export default function Menu({
   onAssessment,
   letterCase = LETTER_CASES.upper,
   onLetterCaseChange,
+  selectedStep: controlledStep,
+  onSelectedStepChange,
 }) {
   const [mode, setMode] = useState(MODES.h2r);
-  const [selectedStep, setSelectedStep] = useState(STEPS.seion);
+  // 親から渡されない場合（単体利用）は内部で保持する。
+  const [internalStep, setInternalStep] = useState(STEPS.seion);
+  const selectedStep = controlledStep ?? internalStep;
+  const setSelectedStep = (step) => {
+    setInternalStep(step);
+    onSelectedStepChange?.(step);
+  };
   const [weakAvailable, setWeakAvailable] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const longPressTimerRef = useRef(null);

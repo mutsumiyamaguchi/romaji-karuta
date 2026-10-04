@@ -275,4 +275,30 @@ describe('<App /> async boot', () => {
     expect(localStorage.getItem('romajiLetterCase')).toBe('lower');
     expect(lowerBtn).toHaveAttribute('aria-pressed', 'true');
   });
+
+  it('keeps the selected step tab after returning from practice to the menu', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const { CURRICULUM } = await import('../../src/data/curriculum.js');
+    mocks.getStatus.mockResolvedValue(true);
+    mocks.listStudents.mockResolvedValue([{ id: 's1', name: 'たろう', points: 0 }]);
+    mocks.getPoints.mockResolvedValue(1000);
+    mocks.getProgress.mockResolvedValue({
+      totalPoints: 1000,
+      availablePoints: 0,
+      passedSteps: [1],
+      practiceCompletions: [],
+      assessments: [],
+      access: CURRICULUM.flatMap((step) => step.units.map((unitId) => ({ unitId, step: step.number, access: 'available' }))),
+    });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole('tab', { name: /ステップ2/ }));
+    await user.click(screen.getByRole('button', { name: /^が ぎょう/ }));
+    await user.click(await screen.findByTitle('メニューにもどる'));
+
+    expect(await screen.findByRole('tab', { name: /ステップ2/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('button', { name: /^が ぎょう/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^あ ぎょう/ })).not.toBeInTheDocument();
+  });
 });

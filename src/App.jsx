@@ -57,6 +57,8 @@ export default function App() {
   const [playMode, setPlayMode] = useState(MODES.h2r);
   const [letterCase, setLetterCase] = useState(() => readLetterCase());
   const [gameLetterCase, setGameLetterCase] = useState(letterCase);
+  // メニューで選択中の学習ステップ。Menu は画面遷移で破棄されるため App で保持する。
+  const [menuStep, setMenuStep] = useState(STEPS.seion);
   const [pinOpen, setPinOpen] = useState(false);
   const [questions, setQuestions] = useState([]);
   const [score, setScore] = useState(0);
@@ -344,6 +346,8 @@ export default function App() {
           onAssessment={() => setMode('assessment')}
           letterCase={letterCase}
           onLetterCaseChange={handleLetterCaseChange}
+          selectedStep={menuStep}
+          onSelectedStepChange={setMenuStep}
         />
       )}
       {mode === 'playing' && (
