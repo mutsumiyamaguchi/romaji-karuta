@@ -41,8 +41,8 @@ describe('<Menu />', () => {
 
   it('shows only step 1 rows initially', () => {
     render(<Menu points={0} progress={openProgress} onStart={() => {}} />);
-    expect(screen.getByRole('button', { name: 'あ ぎょう' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'わ ぎょう' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^あ ぎょう/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^わ ぎょう/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /が ぎょう/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /きゃ ぎょう/ })).not.toBeInTheDocument();
   });
@@ -51,12 +51,12 @@ describe('<Menu />', () => {
     const user = userEvent.setup();
     render(<Menu points={0} progress={openProgress} onStart={() => {}} />);
     await user.click(screen.getByRole('tab', { name: /ステップ2/ }));
-    expect(screen.getByRole('button', { name: 'が ぎょう' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '小さいつ ぎょう' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'あ ぎょう', exact: true })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^が ぎょう/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^小さいつ ぎょう/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^あ ぎょう/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /きゃ ぎょう/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: /ステップ3/ }));
-    expect(screen.getByRole('button', { name: 'きゃ ぎょう' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^きゃ ぎょう/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /が ぎょう/ })).not.toBeInTheDocument();
   });
 
@@ -94,8 +94,42 @@ describe('<Menu />', () => {
     const onStart = vi.fn();
     const user = userEvent.setup();
     render(<Menu points={0} progress={openProgress} onStart={onStart} />);
-    await user.click(screen.getByRole('button', { name: 'あ ぎょう' }));
+    await user.click(screen.getByRole('button', { name: /^あ ぎょう/ }));
     expect(onStart).toHaveBeenCalledWith('あ', 'h2r', 'upper');
+  });
+
+  it('marks rows that already earned points and rows that still can', () => {
+    const progress = { ...newStudentProgress, practiceCompletions: [{ unit_id: 'seion:あ', reward: 100 }] };
+    render(<Menu points={100} progress={progress} onStart={() => {}} />);
+    const cleared = screen.getByRole('button', { name: /^あ ぎょう/ });
+    const pending = screen.getByRole('button', { name: /^か ぎょう/ });
+    expect(cleared).toHaveTextContent('クリア');
+    expect(cleared).toHaveAttribute('data-cleared', 'true');
+    expect(cleared).not.toHaveTextContent('+100');
+    expect(pending).toHaveTextContent('+100');
+    expect(pending).toHaveAttribute('data-cleared', 'false');
+    expect(screen.getByTestId('clear-status')).toHaveTextContent('クリア 1 / 10');
+  });
+
+  it('announces that every row is cleared', () => {
+    const practiceCompletions = rows
+      .filter((row) => romajiList.some((item) => item.row === row && item.step === 'seion'))
+      .map((row) => ({ unit_id: `seion:${row}`, reward: 100 }));
+    render(<Menu points={1000} progress={{ ...newStudentProgress, practiceCompletions }} onStart={() => {}} />);
+    expect(screen.getByTestId('clear-status')).toHaveTextContent('クリア 10 / 10');
+    expect(screen.getByTestId('clear-status')).toHaveTextContent('うでだめしに ちょうせん');
+  });
+
+  it('hides reward marks during legacy preview and on locked steps', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<Menu points={0} progress={legacyProgress} onStart={() => {}} />);
+    await user.click(screen.getByRole('tab', { name: /ステップ2/ }));
+    expect(screen.queryByTestId('clear-status')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^が ぎょう/ })).not.toHaveTextContent('+125');
+    unmount();
+    render(<Menu points={0} progress={newStudentProgress} onStart={() => {}} />);
+    await user.click(screen.getByRole('tab', { name: /ステップ2/ }));
+    expect(screen.queryByTestId('clear-status')).not.toBeInTheDocument();
   });
 
   it('shows the title and prompt copy', () => {

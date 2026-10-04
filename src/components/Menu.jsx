@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Star, Flame, ChevronDown, Lock, User } from 'lucide-react';
+import { Star, Flame, ChevronDown, Lock, User, CheckCircle2 } from 'lucide-react';
 import { rows, romajiList, STEPS } from '../data/romaji.js';
+import { CURRICULUM } from '../data/curriculum.js';
 
 // ステップ別ボタンの表示メタ。
 // 件数表示はデータから動的に計算する（データ変更時に追従させるため）。
@@ -141,6 +142,12 @@ export default function Menu({
       : progress?.access?.find((entry) => entry.unitId === `${item?.step}:${row}`)?.access ?? 'locked';
   };
   const selectedStepLocked = visibleRows.every((row) => accessForRow(row) === 'locked');
+  // ポイント獲得済み（初回全問正解済み）の行。progress が無い場合は表示しない。
+  const completedUnits = new Set((progress?.practiceCompletions ?? []).map((item) => item.unit_id));
+  const selectedReward = CURRICULUM.find((item) => item.key === selectedStep)?.reward ?? 0;
+  const isRowCleared = (row) => completedUnits.has(`${selectedStep}:${row}`);
+  const clearedCount = visibleRows.filter(isRowCleared).length;
+  const showClearStatus = Boolean(progress) && !selectedStepLocked && !visibleRows.some((row) => accessForRow(row) === 'legacy-preview');
   const selectedStepPreview = visibleRows.some((row) => accessForRow(row) === 'legacy-preview');
 
   return (
@@ -312,17 +319,53 @@ export default function Menu({
         </div>
       )}
 
+      {showClearStatus && (
+        <div
+          className="mb-4 flex w-full max-w-3xl flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm font-bold sm:text-base"
+          data-testid="clear-status"
+        >
+          <span className="rounded-full bg-green-100 px-4 py-1.5 text-green-700">
+            クリア {clearedCount} / {visibleRows.length}
+          </span>
+          {clearedCount < visibleRows.length ? (
+            <span className="text-orange-700">
+              ぜんもん せいかいで <Star className="inline h-4 w-4 fill-yellow-400 text-yellow-400" /> +{selectedReward} の ぎょうが のこっているよ
+            </span>
+          ) : (
+            <span className="text-green-700">ぜんぶ クリア！ うでだめしに ちょうせん できるよ</span>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 w-full max-w-3xl mb-6">
         {visibleRows.map((row) => {
           const access = accessForRow(row);
+          const cleared = showClearStatus && isRowCleared(row);
+          const pending = showClearStatus && !cleared && access === 'available';
           return (
           <button
             key={row}
             disabled={access === 'locked'}
             onClick={() => access !== 'locked' && handleStart(row)}
-            className="bg-white border-4 border-orange-400 rounded-2xl py-4 shadow-[0_6px_0_#f6ad55] active:shadow-[0_0px_0_#f6ad55] active:translate-y-2 transition-all flex flex-col items-center justify-center text-3xl font-bold text-orange-600 hover:bg-orange-50 disabled:opacity-40"
+            data-cleared={showClearStatus ? String(cleared) : undefined}
+            className={[
+              'border-4 rounded-2xl py-4 active:translate-y-2 transition-all flex flex-col items-center justify-center text-3xl font-bold disabled:opacity-40',
+              cleared
+                ? 'bg-green-50 border-green-500 text-green-700 shadow-[0_6px_0_#22c55e] active:shadow-[0_0px_0_#22c55e] hover:bg-green-100'
+                : 'bg-white border-orange-400 text-orange-600 shadow-[0_6px_0_#f6ad55] active:shadow-[0_0px_0_#f6ad55] hover:bg-orange-50',
+            ].join(' ')}
           >
             {row} ぎょう
+            {cleared && (
+              <span className="mt-1 flex items-center gap-1 rounded-full bg-green-500 px-3 py-0.5 text-xs text-white">
+                <CheckCircle2 className="h-4 w-4" />クリア
+              </span>
+            )}
+            {pending && (
+              <span className="mt-1 flex items-center gap-1 rounded-full bg-yellow-100 px-3 py-0.5 text-xs text-yellow-700">
+                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />+{selectedReward}
+              </span>
+            )}
             {access === 'legacy-preview' && <span className="text-xs">さきどりれんしゅう</span>}
             {access === 'locked' && <span className="text-xs">ロック</span>}
           </button>
