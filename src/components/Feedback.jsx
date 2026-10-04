@@ -3,8 +3,8 @@ import { CheckCircle2, XCircle } from 'lucide-react';
 // 正解/不正解オーバーレイ
 // props:
 //   feedback: 'correct' | 'incorrect' | null
-//   correctRomaji: string — 不正解時に表示する正解ローマ字
-export default function Feedback({ feedback, correctRomaji }) {
+// 不正解でも正解は表示しない（正解を見せると同じ行の子音が分かってしまうため）。
+export default function Feedback({ feedback }) {
   if (!feedback) return null;
 
   return (
@@ -20,20 +20,9 @@ export default function Feedback({ feedback, correctRomaji }) {
         ) : (
           <div className="flex flex-col items-center">
             <XCircle className="w-40 h-40 text-red-500 mb-6 drop-shadow-md" />
-            <h2 className="text-6xl md:text-7xl font-black text-red-500 tracking-wider mb-6">
+            <h2 className="text-6xl md:text-7xl font-black text-red-500 tracking-wider">
               ざんねん！
             </h2>
-            <div className="bg-red-50 p-6 rounded-2xl border-4 border-red-200">
-              <p className="text-3xl md:text-4xl font-bold text-gray-700">
-                せいかいは
-              </p>
-              <p className="text-7xl md:text-8xl font-black text-red-600 mt-4">
-                {correctRomaji}
-              </p>
-              <p className="text-3xl md:text-4xl font-bold text-gray-700 mt-4">
-                だよ！
-              </p>
-            </div>
           </div>
         )}
       </div>

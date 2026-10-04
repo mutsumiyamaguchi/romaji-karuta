@@ -54,9 +54,6 @@ export default function Play({
       ? 'text-6xl sm:text-8xl font-bold text-gray-800'
       : 'text-5xl sm:text-7xl font-bold text-gray-800';
 
-  // フィードバック時に正解として表示する文字列
-  const correctChoiceText = getChoiceLabel(currentQ, mode, letterCase);
-
   return (
     <div className="min-h-screen bg-green-50 flex flex-col items-center relative overflow-hidden font-sans">
 
@@ -116,7 +113,7 @@ export default function Play({
       </div>
 
       {/* フィードバックのオーバーレイ（正解/不正解） */}
-      <Feedback feedback={feedback} correctRomaji={correctChoiceText} />
+      <Feedback feedback={feedback} />
 
       {/* ちょっとしたCSSアニメーション用のスタイル追加 */}
       <style dangerouslySetInnerHTML={{__html: `

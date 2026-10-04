@@ -14,11 +14,10 @@ describe('<Feedback />', () => {
     expect(screen.queryByText('ざんねん！')).not.toBeInTheDocument();
   });
 
-  it('shows ざんねん！ and the correct romaji when feedback is "incorrect"', () => {
+  it('shows ざんねん！ without revealing the correct answer when feedback is "incorrect"', () => {
     render(<Feedback feedback="incorrect" correctRomaji="shi" />);
     expect(screen.getByText('ざんねん！')).toBeInTheDocument();
-    expect(screen.getByText('shi')).toBeInTheDocument();
-    expect(screen.getByText('せいかいは')).toBeInTheDocument();
-    expect(screen.getByText('だよ！')).toBeInTheDocument();
+    expect(screen.queryByText('shi')).not.toBeInTheDocument();
+    expect(screen.queryByText('せいかいは')).not.toBeInTheDocument();
   });
 });
