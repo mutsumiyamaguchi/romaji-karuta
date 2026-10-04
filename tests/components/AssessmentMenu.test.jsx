@@ -34,8 +34,34 @@ describe('<AssessmentMenu />', () => {
     const step1 = screen.getByRole('button', { name: /ステップ1/ });
     expect(step1).toBeEnabled();
     expect(step1).toHaveTextContent('1000ポイントで かいほう');
+    // ポイント消費前に確認を挟む。押しただけでは始まらない。
     await user.click(step1);
+    expect(onOpen).not.toHaveBeenCalled();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent('1000ポイント つかって');
+    expect(dialog).toHaveTextContent('つかえるポイント 2000 → 1000');
+    await user.click(screen.getByRole('button', { name: 'やめる' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(onOpen).not.toHaveBeenCalled();
+    await user.click(step1);
+    await user.click(screen.getByRole('button', { name: 'はじめる' }));
     expect(onOpen).toHaveBeenCalledWith(1, false);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('resumes an unlocked assessment without asking again', async () => {
+    const onOpen = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <AssessmentMenu
+        progress={{ ...baseProgress, availablePoints: 0, assessments: [{ step: 1, status: 'in_progress' }] }}
+        onOpen={onOpen}
+        onBack={() => {}}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: /ステップ1/ }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(onOpen).toHaveBeenCalledWith(1, true);
   });
 
   it('keeps an already unlocked assessment available without rechecking points or units', () => {

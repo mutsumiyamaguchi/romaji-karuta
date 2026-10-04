@@ -18,6 +18,7 @@ import Play from './Play.jsx';
 //   studentId: そにもつ記録の宛先
 //   onFinished: (mistakes: Question[]) => void  全問終了時
 //   onPointsChange: (delta: number) => void     正解時。やり直しモードのときは App 側で score だけ増やすハンドラに差し替えられる。
+//   onAnswer: (question, choice, isCorrect) => void  1問回答するたび（うでだめしの逐次保存用）
 //   onBack: () => void  もどるボタン
 export default function PlayContainer({
   initialQuestions,
@@ -27,6 +28,7 @@ export default function PlayContainer({
   studentId,
   onFinished,
   onPointsChange,
+  onAnswer,
   onBack,
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -78,17 +80,19 @@ export default function PlayContainer({
     }, 2000);
   };
 
-  const handleCorrect = () => {
+  const handleCorrect = (choice) => {
     setIsAnimating(true);
     setFeedback('correct');
+    if (currentQuestion) onAnswer?.(currentQuestion, choice, true);
     onPointsChange?.(10);
     advanceAfterFeedback();
   };
 
-  const handleIncorrect = () => {
+  const handleIncorrect = (choice) => {
     setIsAnimating(true);
     setFeedback('incorrect');
     if (currentQuestion) {
+      onAnswer?.(currentQuestion, choice, false);
       setMistakes((arr) => [...arr, currentQuestion]);
       if (studentId) {
         recordMistake(studentId, {
